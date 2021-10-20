@@ -58,7 +58,7 @@ def plot_surf_from_X(X,z):
     x = X[:,1]
     y = X[:,2]
 
-    return plot_surf(x,y,z, x_dp,y_dp)
+    return plot_surf(x,y,z)
 
 
 def plot_colormap(z,x_dp,y_dp,color):
