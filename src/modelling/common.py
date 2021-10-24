@@ -2,6 +2,13 @@ from numpy import random
 from processing.data_preprocessing import center_data
 from sklearn.utils import shuffle
 
+def predict(X_test, beta):
+    '''
+    Predicts target data based on test data.
+    Intercept is added manually at the end.
+    '''   
+    return X_test[:,1:] @ beta[1:] + beta[0]
+
 def decaying_schedule(lr,t,t0=2,t1=20):
     '''
     Decaing schedule for learning rate.
@@ -48,12 +55,12 @@ def momentum(X,z, beta, cost_grad,lmb, lr, vt,gamma):
     return gamma*vt + lr**cost_grad(X,z,beta,lmb)
 
 
-def sgd_step_momentum(X,z, beta, cost_grad,lmb, lr, vt, gamma):
+def sgd_step_momentum(self,X,z, beta, cost_grad,lmb, lr, vt, gamma):
     '''
     Updates beta using cost function gradiant and learning rate
     '''
-    vt = momentum(X,z, beta, cost_grad,lmb, lr, vt, gamma)
-    return beta - vt, vt
+    self.vt = momentum(X,z, beta, cost_grad,lmb, self.lr, self.vt, gamma)
+    return beta - self.vt
 
 def sgd_step(X,z, beta, cost_grad,lmb, lr=0.001, vt=None, gamma=None):
     '''
