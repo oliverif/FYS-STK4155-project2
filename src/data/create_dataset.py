@@ -1,5 +1,5 @@
 from imageio import imread
-from numpy import meshgrid, linspace,ravel, ones,column_stack
+from numpy import meshgrid, linspace,ravel, ones,column_stack, asarray
 
 
 
@@ -8,7 +8,7 @@ def load_data(fileName, x_dp=100, y_dp=100):
     Load 'fileName' and
     extract section (0,0) to (x_dp,y_dp) from fileName
     '''
-    return imread(fileName)[:y_dp,:x_dp]
+    return asarray(imread(fileName)[:y_dp,:x_dp])
 
 def create_normalized_meshgrid(x_dp=100,y_dp=100):
     '''

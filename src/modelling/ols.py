@@ -55,7 +55,7 @@ def analytical_cost_grad(X,z,beta,lmb=None):
     Computes the analytical gradient
     at current X, z and beta values.
     '''
-    return 2*(X.T @ (X @ beta-z))
+    return (2/z.shape[0])*(X.T @ (X @ beta-z))
 
 def auto_cost_grad():
     '''
@@ -71,6 +71,6 @@ def fit_beta_sgd(X_train, z_train, batch_size, n_epochs, lr='decaying' , gradien
     Fit beta using stochastic gradient descent.
     X_train is shuffled between every epoch.
     '''
-    beta = sgd(X_train, z_train, auto_cost_grad(), batch_size, n_epochs, lr)
+    beta = sgd(X_train, z_train, analytical_cost_grad, batch_size, n_epochs, lr)
     return beta
 
