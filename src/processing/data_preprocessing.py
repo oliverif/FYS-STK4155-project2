@@ -1,4 +1,4 @@
-from numpy import mean
+from numpy import mean,std
 
 def center_data(data):
     '''
@@ -6,5 +6,6 @@ def center_data(data):
 
     Returns centered data and offset(mean)
     '''
-    offset_data = mean(data, axis = 0)
-    return data - offset_data, offset_data
+    data_offset = mean(data, axis = 0)
+    
+    return (data - data_offset), data_offset

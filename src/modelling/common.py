@@ -10,11 +10,11 @@ def predict(X_test, beta):
     '''   
     return X_test[:,1:] @ beta[1:] + beta[0]
 
-def decaying_schedule(lr,t,t0=2,t1=20):
+def decaying_schedule(lr,t,t0=5,t1=5):
     '''
     Decaing schedule for learning rate.
     '''
-    return t0/(t+t1)
+    return t0/(t+t1)+0.0001
 
 def const_schedule(lr,t):
     '''
@@ -63,10 +63,11 @@ def sgd_step_momentum(X,z, beta, cost_grad,lmb, lr, vt, gamma):
     vt = momentum(X,z, beta, cost_grad,lmb, lr, vt, gamma)
     return beta - vt, vt
 
-def sgd_step(X,z, beta, cost_grad,lmb, lr=0.001, vt=None, gamma=None):
+def sgd_step(X,z, beta, cost_grad,lmb, lr,intercept, vt=None, gamma=None):
     '''
     Updates beta using cost function gradiant and learning rate
     '''
+    update = X@beta - z
     return beta - lr*cost_grad(X,z,beta,lmb), vt
 
 def sgd(X_train, z_train, cost_gradient, batch_size, n_epochs, lr, lmb=None, momentum=False, gamma=0.5):
@@ -74,14 +75,17 @@ def sgd(X_train, z_train, cost_gradient, batch_size, n_epochs, lr, lmb=None, mom
     Generic stochastic gradient descent.
     X_train is shuffled between every epoch.
     '''
+    print("test")
     #X_train = X_train[:,1:]
 
     #X_train, X_offset = center_data(X_train)
     #z_train,z_offset = center_data(z_train)
+    #X_train[:,0] = 1
     vt = 0
     
     #initalize beta to random values
     beta = random.randn(X_train.shape[1],1)
+    intercept = beta[0]
     #beta[0] = 0
     if(momentum):
         sgd_update = sgd_step_momentum
@@ -93,13 +97,12 @@ def sgd(X_train, z_train, cost_gradient, batch_size, n_epochs, lr, lmb=None, mom
     n_batches = int(z_train.shape[0]/batch_size)
 
 
-
     for epoch in range(n_epochs):
         X_train,z_train = shuffle(X_train,z_train)
         for batch in range(n_batches):
             xi,zi = select_batch(X_train,z_train,batch_size)
             lr = learning_schedule(lr,epoch*n_batches+batch)
-            beta,vt = sgd_update(xi,zi,beta,cost_gradient,lmb,lr,vt,gamma)
+            beta,vt = sgd_update(xi,zi,beta,cost_gradient,lmb,lr,intercept,vt,gamma)
             
 
     #beta[0] = 0

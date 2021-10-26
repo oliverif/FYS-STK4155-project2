@@ -1,4 +1,4 @@
-from numpy import random
+from numpy import random,mean
 from sklearn.utils import shuffle
 from processing.data_preprocessing import center_data
 from model_evaluation.metrics import MSE
@@ -10,28 +10,30 @@ class SGD_optimizer:
     t1 = 20
     vt = 0
 
-    def __init__(self,regularization = 'l2',lmb = 0.001, use_momentum = True, gamma = 0.5, lr = 'decaying',batch_size=None,n_epochs=None):
+    def __init__(self,regularization = 'l2',lmb = 0.001, fit_intercept = False, use_momentum = True, gamma = 0.5, lr = 'decaying',batch_size=None,n_epochs=None):
         self.regularization = regularization
         self.lmb = lmb
 
-        self.use_momentum = True
+        self.use_momentum = use_momentum
         self.gamma = gamma
 
         self.lr = lr
 
         self.batch_size = batch_size
         self.n_epochs = n_epochs
+        self.intercept = 0
+        self.fit_intercept = fit_intercept
+
 
         self.learning_schedule = self.set_schedule()
-        self.cost_func = self.set_cost_func()
-        self.cost_grad = self.set_grad()
+        self.cost_grad = self.set_cost_func()
         self.partial_fit = self.set_partial_fit_func()
         
 
 
     def fit(self,X_train, z_train, batch_size = None, n_epochs = None):
         '''
-        Perform mini-batch stochastic gradient 
+        Performs mini-batch stochastic gradient 
         descent optimization and returns resulting
         parameters. AKA train model using X_train and
         z_train.
@@ -42,39 +44,33 @@ class SGD_optimizer:
         if(n_epochs is not None):
             self.set_n_epochs(n_epochs)
 
-        #Center data before optimization for faster convergence.
-        X_train, X_offset = center_data(X_train)
-        z_train,z_offset = center_data(z_train)
-        
-        
-        #Initalize beta to random values
-        beta = random.randn(X_train.shape[1],1)
+        if(self.fit_intercept):
+            self.intercept = 1
 
-        #Set intercept to 0
-        beta[0] = 0
+        #Initalize beta to random values
+        self.beta = random.randn(X_train.shape[1],1)
 
         n_batches = int(z_train.shape[0]/self.batch_size)
 
         for epoch in range(self.n_epochs):
+
+            #Shuffle training data for next round
             X_train,z_train = shuffle(X_train,z_train)
+
             for batch in range(n_batches):
 
                 #Select a random batch
                 xi,zi = self.select_batch(X_train,z_train)
 
                 #Update lr according to schedule
-                self.lr = self.learning_schedule(epoch*n_batches+batch)
+                self.learning_schedule(epoch*n_batches+batch)
 
                 #Update beta
-                beta = self.partial_fit(xi,zi,beta)
+                self.partial_fit(xi,zi)
 
-                #Shuffle training data for next round
                 
-
-        #Ensure intercept has not exploded during optimization
-        beta[0] = 0
-        beta[0] = z_offset - X_offset @ beta #Intercept
-        return beta
+                
+        return self.beta
 
     def set_n_epochs(self,n_epochs):
         '''
@@ -88,14 +84,6 @@ class SGD_optimizer:
         '''
         self.batch_size = batch_size
 
-    def set_grad(self):
-        '''
-        Creates the gradient of cost function using
-        autograd.
-        Output: Gradient function
-        '''
-        return grad(self.cost_func,2)
-
     def set_cost_func(self, regularization = None):
         '''
         Defines the cost function to be used during optimization
@@ -104,10 +92,9 @@ class SGD_optimizer:
             self.regularization = regularization
 
         if (self.regularization == 'l2'):
-            return self.cost_func_l2
+            return self.cost_grad_l2
         else:
-            print("Cost")
-            return self.cost_func_l0
+            return self.cost_grad_l0
 
     def set_partial_fit_func(self):
         '''
@@ -154,28 +141,25 @@ class SGD_optimizer:
         self.t0 = t0
         self.t1 = t1
 
-    def l2_regularizer(self, beta):
-        '''
-        Calculates the regularizer term used in for instance Ridge
-        '''
-        return self.lmb*beta.T@beta
+    def momentum(self, X,z):
+        update = self.calc_deviation(X,z)
+        if (self.fit_intercept):
+            self.fit_intercept += self.lr*update
 
-    def momentum(self, X,z,beta):
-
-        return self.gamma*self.vt + self.lr*self.cost_grad(X,z,beta)
+        return self.gamma*self.vt + self.lr*self.cost_grad(X,update)
 
     def decaying_schedule(self,t):
         '''
         Decaing schedule for learning rate.
         '''
-        return self.t0/(t+self.t1)
+        self.lr = self.t0/(t+self.t1)
 
 
     def const_schedule(self,t):
         '''
         Constant schedule(i.e no schedule) for learning rate.
         '''
-        return self.lr
+        pass
 
     def select_batch(self, X_train, z_train):
         '''
@@ -187,36 +171,46 @@ class SGD_optimizer:
         zi = z_train[randi*self.batch_size : randi*self.batch_size+self.batch_size]
         return xi, zi
 
-    def sgd_step(self,X,z, beta):
+    def calc_deviation(self, X, z):
         '''
-        Updates beta using cost function gradiant and learning rate
+        Calculates the deviation bewteen prediction
+        and target data.
         '''
-        return beta - self.lr*self.cost_grad(X,z,beta)
-
-    def sgd_step_momentum(self,X,z,beta):
-        '''
-        Updates beta using cost function gradiant and learning rate
-        '''
-        self.vt = self.momentum(X,z,beta)
-        return beta - self.vt
+        pred = X @ self.beta + self.intercept
+        return pred-z
 
 
-    def cost_func_l0(self, X, z_data, beta):
+    def sgd_step(self,X,z):
         '''
-        Cost function is essentially the same as MSE
-        however replaces input 'z_model' 
-        with two inputs: X and beta.
-        This enables autograd to derivate with respect
-        to beta.
+        Updates beta using cost function gradiant and learning rate.
         '''
-        return MSE(z_data,predict(X,beta))
+        update = self.calc_deviation(X,z)
 
-    def cost_func_l2(self, X, z_data, beta):
+        if (self.fit_intercept):
+            self.intercept -= self.lr*mean(update)
+
+        self.beta -= self.lr*self.cost_grad(X,update)
+
+    def sgd_step_momentum(self,X,z):
         '''
-        Cost function for ridge MSE + l2.
-        Replaces input 'z_model' 
-        with two inputs: X and beta.
-        This enables autograd to derivate with respect
-        to beta.
+        Updates beta with momentum using cost function gradiant and learning rate.
         '''
-        return MSE(z_data,predict(X,beta)) + self.l2_regularizer(beta)
+        update = self.calc_deviation(X,z)
+        if (self.fit_intercept):
+            self.intercept -= self.lr*mean(update)      
+
+        self.vt = self.gamma*self.vt + self.lr*self.cost_grad(X,update)
+        self.beta -= self.vt
+
+
+    def cost_grad_l0(self, X, update):
+        '''
+        Gradient of squared loss cost function.
+        '''
+        return (2/X.shape[0])*(X.T @ update)
+
+    def cost_grad_l2(self, X, update):
+        '''
+        Gradient of squared loss cost function with l2 regularizer.
+        '''
+        return (2/X.shape[0])*(X.T @ update) + 2*self.lmb*self.beta

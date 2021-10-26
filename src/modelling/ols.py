@@ -55,7 +55,7 @@ def analytical_cost_grad(X,z,beta,lmb=None):
     Computes the analytical gradient
     at current X, z and beta values.
     '''
-    return (2/z.shape[0])*(X.T @ (X @ beta-z))
+    return (1/z.shape[0])*(X.T @ (X @ beta-z))
 
 def auto_cost_grad():
     '''
