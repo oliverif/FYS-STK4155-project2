@@ -1,14 +1,17 @@
-from numpy import random,mean
+from modelling.ols import fit_beta
+from numpy import random,mean, sum
 from sklearn.utils import shuffle
 from processing.data_preprocessing import center_data
-from model_evaluation.metrics import MSE
+from model_evaluation.metrics import MSE, R2
 from modelling.common import predict
-from autograd import grad
+
 
 class SGD_optimizer:
     t0 = 2
     t1 = 20
-    vt = 0
+    
+    mse = 0
+    r2 = 0
 
     def __init__(self,regularization = 'l2',lmb = 0.001, fit_intercept = False, use_momentum = True, gamma = 0.5, lr = 'decaying',batch_size=None,n_epochs=None):
         self.regularization = regularization
@@ -18,6 +21,7 @@ class SGD_optimizer:
         self.gamma = gamma
 
         self.lr = lr
+        self.vt = 0
 
         self.batch_size = batch_size
         self.n_epochs = n_epochs
@@ -28,6 +32,15 @@ class SGD_optimizer:
         self.learning_schedule = self.set_schedule()
         self.cost_grad = self.set_cost_func()
         self.partial_fit = self.set_partial_fit_func()
+
+        self.param_setters = {'lmb':self.set_lmb,
+        'regularization':self.set_cost_func,
+        'fit_intercept':self.set_fit_intercept,
+        'batch_size':self.set_batch_size,
+        'n_epochs':self.set_n_epochs,
+        'lr':self.set_lr,
+        'use_momentum':self.set_partial_fit_func,
+        'gamma':self.set_gamma}
         
 
 
@@ -50,8 +63,11 @@ class SGD_optimizer:
         #Initalize beta to random values
         self.beta = random.randn(X_train.shape[1],1)
 
-        n_batches = int(z_train.shape[0]/self.batch_size)
+        #Reset momentum
+        self.vt = 0
 
+        n_batches = int(z_train.shape[0]/self.batch_size)
+        print(self.lr)
         for epoch in range(self.n_epochs):
 
             #Shuffle training data for next round
@@ -72,6 +88,31 @@ class SGD_optimizer:
                 
         return self.beta
 
+    def get_params(self, deep=True):
+        return {'lmb':self.lmb,
+        'regularization':self.regularization,
+        'fit_intercept':self.fit_intercept,
+        'batch_size':self.batch_size,
+        'n_epochs':self.n_epochs,
+        'lr':self.lr,
+        'gamma':self.gamma}
+
+    def set_params(self,**params):
+
+        for key, val in params.items():
+            self.param_setters[key](val)
+
+        return self
+   
+    def predict(self,X):
+        return predict(X,self.beta)
+
+    def _score(self,X,y):
+        return R2(y,predict(X,self.beta))
+
+    def set_fit_intercept(self,fit_intercept):
+        self.fit_intercept = fit_intercept
+
     def set_n_epochs(self,n_epochs):
         '''
         Sets number of epochs to be used during training
@@ -83,6 +124,9 @@ class SGD_optimizer:
         Sets batch size to be used during training
         '''
         self.batch_size = batch_size
+
+    def set_gamma(self,gamma):
+        self.gamma = gamma
 
     def set_cost_func(self, regularization = None):
         '''
@@ -116,6 +160,12 @@ class SGD_optimizer:
         Sets the learning rate
         '''
         self.lr = lr
+
+    def set_lmb(self,lmb):
+        '''
+        Sets lambda used for regularization
+        '''
+        self.lmb = lmb
 
     def set_schedule(self,lr=None):
         '''
@@ -176,6 +226,7 @@ class SGD_optimizer:
         Calculates the deviation bewteen prediction
         and target data.
         '''
+
         pred = X @ self.beta + self.intercept
         return pred-z
 
@@ -214,3 +265,17 @@ class SGD_optimizer:
         Gradient of squared loss cost function with l2 regularizer.
         '''
         return (2/X.shape[0])*(X.T @ update) + 2*self.lmb*self.beta
+
+    def score(self,X,z):
+        z_tilde = predict(X,self.beta)
+        self.mse = MSE(z,z_tilde)
+        self.r2 = R2(z,z_tilde)
+
+    def fit_score(self,X_train, z_train, X_test, z_test):
+
+        self.fit(X_train,z_train)
+        self.score(X_train,z_train)
+        z_pred = predict(X_test,self.beta)
+
+        return self.mse, MSE(z_test,z_pred), self.r2, R2(z_test,z_pred)
+
