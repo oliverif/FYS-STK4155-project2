@@ -26,12 +26,6 @@ def fit_beta(X_train,z_train,fit_intercept=True):
     return beta
 
 
-def predict(X_test, beta):
-    '''
-    Predicts target data based on test data.
-    Intercept is added manually at the end.
-    '''   
-    return X_test[:,1:] @ beta[1:] + beta[0]
 
 def fit_predict(X_train, z_train, X_test):
     '''

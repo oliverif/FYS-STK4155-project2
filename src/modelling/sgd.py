@@ -1,5 +1,5 @@
 from modelling.ols import fit_beta
-from numpy import random,mean, sum
+from numpy import random,mean, sum,zeros
 from sklearn.utils import shuffle
 from processing.data_preprocessing import center_data
 from model_evaluation.metrics import MSE, R2
@@ -7,20 +7,34 @@ from modelling.common import predict
 
 
 class SGD_optimizer:
-    t0 = 2
-    t1 = 20
+    t0 = 50
+    t1 = 300
+    
+    power_t = 0.05
     
     mse = 0
     r2 = 0
 
-    def __init__(self,regularization = 'l2',lmb = 0.001, fit_intercept = False, use_momentum = True, gamma = 0.5, lr = 'decaying',batch_size=None,n_epochs=None):
+    def __init__(self,
+                 regularization = 'l2',
+                 lmb = 0.001, 
+                 fit_intercept = False, 
+                 use_momentum = True, 
+                 gamma = 0.5,
+                 schedule = 'constant',
+                 lr0 = 0.01,
+                 batch_size=None,
+                 n_epochs=None):
+        
         self.regularization = regularization
         self.lmb = lmb
 
         self.use_momentum = use_momentum
         self.gamma = gamma
 
-        self.lr = lr
+        self.lr0 = lr0
+        
+        self.schedule = schedule
         self.vt = 0
 
         self.batch_size = batch_size
@@ -31,24 +45,23 @@ class SGD_optimizer:
 
         self.learning_schedule = self.set_schedule()
         self.cost_grad = self.set_cost_func()
-        self.partial_fit = self.set_partial_fit_func()
 
         self.param_setters = {'lmb':self.set_lmb,
-        'regularization':self.set_cost_func,
-        'fit_intercept':self.set_fit_intercept,
-        'batch_size':self.set_batch_size,
-        'n_epochs':self.set_n_epochs,
-        'lr':self.set_lr,
-        'use_momentum':self.set_partial_fit_func,
-        'gamma':self.set_gamma}
+                              'regularization':self.set_cost_func,
+                              'fit_intercept':self.set_fit_intercept,
+                              'batch_size':self.set_batch_size,
+                              'n_epochs':self.set_n_epochs,
+                              'lr':self.set_lr,
+                              'use_momentum':self.set_partial_fit_func,
+                              'gamma':self.set_gamma}
         
 
 
     def fit(self,X_train, z_train, batch_size = None, n_epochs = None):
         '''
         Performs mini-batch stochastic gradient 
-        descent optimization and returns resulting
-        parameters. AKA train model using X_train and
+        descent optimization and stores resulting
+        parameters in self.beta. AKA train model using X_train and
         z_train.
         '''
         #Set batch size and epochs if given
@@ -61,41 +74,32 @@ class SGD_optimizer:
             self.intercept = 1
 
         #Initalize beta to random values
-        self.beta = random.randn(X_train.shape[1],1)
+        #self.beta = random.randn(X_train.shape[1],1)
+
+        #Initialize beta to zeros
+        self.beta = zeros(X_train.shape[1]).reshape(-1,1)
 
         #Reset momentum
         self.vt = 0
 
+        #The number of batches is calculated from batch size.
         n_batches = int(z_train.shape[0]/self.batch_size)
-        print(self.lr)
+
         for epoch in range(self.n_epochs):
-
-            #Shuffle training data for next round
-            X_train,z_train = shuffle(X_train,z_train)
-
             for batch in range(n_batches):
-
                 #Select a random batch
                 xi,zi = self.select_batch(X_train,z_train)
 
                 #Update lr according to schedule
                 self.learning_schedule(epoch*n_batches+batch)
 
-                #Update beta
+                #Update parameters
                 self.partial_fit(xi,zi)
 
-                
-                
-        return self.beta
+            #Shuffle training data for next round
+            X_train,z_train = shuffle(X_train,z_train)
 
-    def get_params(self, deep=True):
-        return {'lmb':self.lmb,
-        'regularization':self.regularization,
-        'fit_intercept':self.fit_intercept,
-        'batch_size':self.batch_size,
-        'n_epochs':self.n_epochs,
-        'lr':self.lr,
-        'gamma':self.gamma}
+        return self
 
     def set_params(self,**params):
 
@@ -103,16 +107,7 @@ class SGD_optimizer:
             self.param_setters[key](val)
 
         return self
-   
-    def predict(self,X):
-        return predict(X,self.beta)
-
-    def _score(self,X,y):
-        return R2(y,predict(X,self.beta))
-
-    def set_fit_intercept(self,fit_intercept):
-        self.fit_intercept = fit_intercept
-
+ 
     def set_n_epochs(self,n_epochs):
         '''
         Sets number of epochs to be used during training
@@ -128,33 +123,6 @@ class SGD_optimizer:
     def set_gamma(self,gamma):
         self.gamma = gamma
 
-    def set_cost_func(self, regularization = None):
-        '''
-        Defines the cost function to be used during optimization
-        '''
-        if (regularization is not None):
-            self.regularization = regularization
-
-        if (self.regularization == 'l2'):
-            return self.cost_grad_l2
-        else:
-            return self.cost_grad_l0
-
-    def set_partial_fit_func(self):
-        '''
-        Sets the partial fit function.
-        The partial fit function is used
-        to update the sgd optimization with
-        one step. I.e subtract the gradient
-        from the parameters once. 
-        '''
-        if(self.use_momentum):
-            return self.sgd_step_momentum
-        else:
-            return self.sgd_step
-
-            
-
     def set_lr(self, lr):
         '''
         Sets the learning rate
@@ -167,20 +135,23 @@ class SGD_optimizer:
         '''
         self.lmb = lmb
 
-    def set_schedule(self,lr=None):
+    def set_schedule(self,schedule=None):
         '''
         Returns a learning schedule based on input
         string.
         '''
-        #If learning rate is given
-        if(lr is not None):
-            self.set_lr(lr)
-
         
-        if(self.lr=='decaying'):
+        if(schedule is not None):
+            self.schedule = schedule
+
+        #Also set the learning rate function
+        if(self.schedule=='decaying'):
             return self.decaying_schedule
-        elif(isinstance(self.lr,float) or isinstance(self.lr,int)):
+        elif(self.schedule=='constant'):
+            self.lr = self.lr0
             return self.const_schedule
+        elif(self.schedule =='invscaling'):
+            return self.invscaling_schedule
         else:
             raise ValueError
 
@@ -191,19 +162,14 @@ class SGD_optimizer:
         self.t0 = t0
         self.t1 = t1
 
-    def momentum(self, X,z):
-        update = self.calc_deviation(X,z)
-        if (self.fit_intercept):
-            self.fit_intercept += self.lr*update
-
-        return self.gamma*self.vt + self.lr*self.cost_grad(X,update)
-
     def decaying_schedule(self,t):
         '''
         Decaing schedule for learning rate.
         '''
         self.lr = self.t0/(t+self.t1)
 
+    def invscaling_schedule(self,t):
+        self.lr = self.lr0/pow(t+1,self.power_t)
 
     def const_schedule(self,t):
         '''
@@ -221,6 +187,71 @@ class SGD_optimizer:
         zi = z_train[randi*self.batch_size : randi*self.batch_size+self.batch_size]
         return xi, zi
 
+
+
+    def set_fit_intercept(self,fit_intercept):
+        self.fit_intercept = fit_intercept
+
+    def score(self,X,z):
+        '''
+        Calculates the scores for this model
+        '''
+        z_tilde = predict(X,self.beta)
+        self.mse = MSE(z,z_tilde)
+        self.r2 = R2(z,z_tilde)
+
+        return self.mse
+
+    def get_params(self, deep=True):
+        return {'lmb':self.lmb,
+        'regularization':self.regularization,
+        'fit_intercept':self.fit_intercept,
+        'batch_size':self.batch_size,
+        'n_epochs':self.n_epochs,
+        'lr':self.lr,
+        'gamma':self.gamma}
+
+    def predict(self,X):
+        return predict(X,self.beta)
+
+    def set_cost_func(self, regularization = None):
+        '''
+        Defines the cost function to be used during optimization
+        '''
+        if (regularization is not None):
+            self.regularization = regularization
+
+        if (self.regularization == 'l2'):
+            return self.cost_grad_l2
+        else:
+            return self.cost_grad_l0
+      
+    def partial_fit(self,X,z):
+        '''
+        Single SGD step to updates parameters.
+        '''
+        update = self.calc_deviation(X,z)
+
+        if (self.fit_intercept):
+            self.intercept -= self.lr*mean(update)
+
+        if (self.momentum):
+            
+            self.vt = self.gamma*self.vt + self.lr*self.cost_grad(X,update)
+            self.beta -= self.vt
+            
+        else:
+            self.beta -= self.lr*self.cost_grad(X,update)
+
+
+    def momentum(self, X,z):
+        update = self.calc_deviation(X,z)
+        if (self.fit_intercept):
+            self.fit_intercept += self.lr*update
+
+        return self.gamma*self.vt + self.lr*self.cost_grad(X,update)
+
+
     def calc_deviation(self, X, z):
         '''
         Calculates the deviation bewteen prediction
@@ -231,45 +262,20 @@ class SGD_optimizer:
         return pred-z
 
 
-    def sgd_step(self,X,z):
-        '''
-        Updates beta using cost function gradiant and learning rate.
-        '''
-        update = self.calc_deviation(X,z)
-
-        if (self.fit_intercept):
-            self.intercept -= self.lr*mean(update)
-
-        self.beta -= self.lr*self.cost_grad(X,update)
-
-    def sgd_step_momentum(self,X,z):
-        '''
-        Updates beta with momentum using cost function gradiant and learning rate.
-        '''
-        update = self.calc_deviation(X,z)
-        if (self.fit_intercept):
-            self.intercept -= self.lr*mean(update)      
-
-        self.vt = self.gamma*self.vt + self.lr*self.cost_grad(X,update)
-        self.beta -= self.vt
 
 
     def cost_grad_l0(self, X, update):
         '''
         Gradient of squared loss cost function.
         '''
-        return (2/X.shape[0])*(X.T @ update)
+        return (1/X.shape[0])*(X.T @ update)
 
     def cost_grad_l2(self, X, update):
         '''
         Gradient of squared loss cost function with l2 regularizer.
         '''
-        return (2/X.shape[0])*(X.T @ update) + 2*self.lmb*self.beta
+        return (2/X.shape[0])*(X.T @ update) + (2/X.shape[0])*self.lmb*self.beta
 
-    def score(self,X,z):
-        z_tilde = predict(X,self.beta)
-        self.mse = MSE(z,z_tilde)
-        self.r2 = R2(z,z_tilde)
 
     def fit_score(self,X_train, z_train, X_test, z_test):
 

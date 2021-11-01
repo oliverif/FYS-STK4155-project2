@@ -5,8 +5,9 @@ from matplotlib.ticker import LinearLocator, FormatStrFormatter
 import numpy as np
 from utils.utils import *
 from math import ceil
+from scipy.interpolate import griddata
 
-def plot_surf(x,y,z):
+def plot_surf(x,y,z,title):
     '''
     Plots the surface defined by the coordinates x,y,z.
     Assumes x and y is or has been a meshgrid.
@@ -17,22 +18,29 @@ def plot_surf(x,y,z):
     x_dp=int(np.sqrt(x.shape[0]))
     y_dp=int(np.sqrt(y.shape[0]))
 
-    #Ensure flattened array
-    if(x.shape!=(y_dp,x_dp)):
+
+    '''if(x.shape!=(y_dp,x_dp)):
         x = x[:x_dp**2].reshape(y_dp,x_dp)
     if(y.shape!=(y_dp,x_dp)):
         y = y[:y_dp**2].reshape(y_dp,x_dp)       
     if(z.shape!=(y_dp,x_dp)):
-         z = z[:y_dp*x_dp].reshape(y_dp,x_dp)  
+         z = z[:y_dp*x_dp].reshape(y_dp,x_dp) ''' 
+    
 
+    xi = np.linspace(np.min(x),np.max(x),100)
+    yi = np.linspace(np.min(y),np.max(y),100)
+    xi,yi = np.meshgrid(xi,yi)
+
+
+    zi = griddata((x,y),z,(xi.ravel(),yi.ravel()),method='cubic')
+    zi = zi.reshape(100,100)
 
     fig = plt.figure()
     fig.set_size_inches(10,10)
     ax = fig.add_subplot(111, projection='3d')
 
-
-    surf = ax.plot_surface(x, y, z, cmap=cm.coolwarm,
-                           linewidth=0, antialiased=True)
+    surf = ax.plot_surface(xi, yi, zi, cmap=cm.coolwarm,
+                           linewidth=0, antialiased=True,vmin=np.nanmin(z), vmax=np.nanmax(z))
 
     
     ax.zaxis.set_major_locator(LinearLocator(8))
@@ -48,10 +56,11 @@ def plot_surf(x,y,z):
     ax.set_zlim3d(np.min(z), np.max(z))
     #Add a color bar which maps values to colors.
     fig.colorbar(surf, shrink=0.5, aspect=15,pad = 0.2) 
-    plt.close()   
+    plt.title(title)
+    #plt.close()   
     return ax
 
-def plot_surf_from_X(X,z):
+def plot_surf_from_X(X,z,title):
     '''
     Plotting surface directly from degisn matrix.
     Assumes the feature x is along column 1 of X, and feature y is along column 2.
@@ -60,7 +69,7 @@ def plot_surf_from_X(X,z):
     x = X[:,1]
     y = X[:,2]
 
-    return plot_surf(x,y,z)
+    return plot_surf(x,y,z,title)
 
 
 def plot_colormap(z,x_dp,y_dp,color):
