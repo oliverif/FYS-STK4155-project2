@@ -66,8 +66,12 @@ def plot_surf_from_X(X,z,title):
     Assumes the feature x is along column 1 of X, and feature y is along column 2.
     '''
     X,z = sort_surface(X,z)
-    x = X[:,1]
-    y = X[:,2]
+    if(X.shape[1]==2):
+        x = X[:,0]
+        y = X[:,1]
+    else:
+        x = X[:,1]
+        y = X[:,2]
 
     return plot_surf(x,y,z,title)
 

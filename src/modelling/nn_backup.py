@@ -13,7 +13,7 @@ def relu(z):
     return np.maximum(z,0)
 
 def leakyrelu(z):
-    return np.where(z>=0,z,0.01*z)
+    return np.where(z>0,z,0.001*z)
        
 def softmax(z):
     return np.exp(z)/np.sum(np.exp(z),axis=0)
@@ -28,10 +28,10 @@ def identity_derivative(z):
     return z
  
 def relu_derivative(z):
-    return np.where(z<0,0,1)
+    return np.where(z>0,1,0)
 
 def leakyrelu_derivative(z):
-    return np.where(z>0,1,0.01)
+    return np.where(z>0,1,0.001)
        
 def softmax_derivative(z):
     return np.exp(z)/np.sum(np.exp(z),axis=0)
@@ -75,13 +75,11 @@ class NeuralNetwork:
             n_epochs=10,
             batch_size=32,
             schedule = 'constant',
-            w_init='uniform',
-            b_init = 0.001,
             lr0 = 0.01,
             use_momentum = True, 
             gamma = 0.5,
             regularization = 'l2',
-            lmb = 0.001, 
+            lmb = 0.0001, 
             ):
 
 
@@ -97,8 +95,7 @@ class NeuralNetwork:
         self.use_momentum = use_momentum
         self.gamma = gamma
         self.lr = lr0
-        self.w_init = w_init
-        self.b_init = b_init
+        
         self.n_categories = n_categories
         self.regularization = regularization
 
@@ -137,16 +134,10 @@ class NeuralNetwork:
         self.layers[-1] = Layer(w,b,self.output_activation)
                  
     def init_w(self,n_features,n_neurons):
-        if (self.w_init=='normal'):
-            return random.randn(n_features, n_neurons)
-        elif(self.w_init=='uniform'):
-            return random.uniform(0,1,(n_features, n_neurons))
-        elif(self.w_init =='glorot'):
-            limit = np.sqrt(6.0/(n_features+n_neurons))
-            return random.uniform(-limit,limit,(n_features, n_neurons))
+        return random.randn(n_features, n_neurons)
     
     def init_b(self,lenght):
-        return full(lenght,self.b_init)
+        return full(lenght,self.bias_init)
     
     def feed_forward(self,X):
         '''
@@ -162,13 +153,12 @@ class NeuralNetwork:
             
             #Store activations in layer object
             layer.activations = layer.activate(layer.z_h)
-
             a = layer.activations
             
             #Set activation as input for next iteration
             #a = layer.activations
     
-    def fast_feed_forward(self,X):    
+    def fast_feed_forwards(self,X):    
         '''
         Feeds X forward in the network and
         returns output layer activation
@@ -197,27 +187,22 @@ class NeuralNetwork:
         #Store weights for next layer
         weights = self.layers[-1].weights
 
-
         w_grad, b_grad = self._calc_grads(weights,self.layers[-2].activations, error)
-
         self._update_weights_and_biases(self.layers[-1],w_grad,b_grad)
         
         for i in range(len(self.layers)-2,0,-1):
-
             #Next layer error
-            #error = matmul(error, weights.T)*self.layers[i].derivative(self.layers[i].z_h)
-            error = (error @ weights.T)*self.layers[i].derivative(self.layers[i].z_h)
+            error = matmul(error, weights.T)*self.layers[i].derivative(self.layers[i].z_h)
             #Store weights for next iteration
             weights = self.layers[i].weights
 
             w_grad, b_grad = self._calc_grads(weights,self.layers[i-1].activations, error)
-            
             #Back propagate one step
             self._update_weights_and_biases(self.layers[i],w_grad,b_grad)
             
             
         #First layer
-        error = matmul(error, weights.T)*self.layers[0].derivative(self.layers[0].z_h)
+        error = matmul(error, weights.T)*self.layers[0].activations*(1-self.layers[0].activations)
         w_grad, b_grad = self._calc_grads(self.layers[0].weights, X, error)
         self._update_weights_and_biases(self.layers[0],w_grad,b_grad)
      
@@ -231,27 +216,26 @@ class NeuralNetwork:
         '''
         
         if (self.use_momentum):    
-            layer.v_w = self.gamma*layer.v_w - self.lr*w_grad
-            layer.v_b = self.gamma*layer.v_b - self.lr*b_grad
-            layer.weights += layer.v_w
-            layer.bias += layer.v_b
+            layer.v_w = self.gamma*layer.v_w + self.lr*w_grad
+            layer.v_b = self.gamma*layer.v_b + self.lr*b_grad
+            layer.weights -= layer.v_w
+            layer.bias -= layer.v_b
             
         else:
-            layer.weights -=  self.lr*w_grad
-            layer.bias -=  self.lr*b_grad
+            layer.weights -= w_grad
+            layer.bias -= b_grad
          
        
     def _calc_grads(self,current_layer_w,prev_layer_a, error):
         #Calculate weights and biases gradients
         w_grad = matmul(prev_layer_a.T,error)
-        b_grad = np.mean(error,axis=0)
-
+        b_grad = np.sum(error,axis=0)
 
         #Add l2 regularization if specified
         if(self.regularization=='l2'):
             w_grad += self.lmb * current_layer_w
         
-        w_grad /=self.batch_size
+        w_grad /=self.n_samples
         
         return w_grad,b_grad
 
@@ -329,7 +313,7 @@ class NeuralNetwork:
     
     def predict(self,X):
         
-        return self.fast_feed_forward(X)
+        return self.fast_feed_forwards(X)
      
     def set_n_epochs(self,n_epochs):
         self.n_epochs = n_epochs

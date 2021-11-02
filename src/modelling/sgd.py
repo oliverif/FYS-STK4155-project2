@@ -212,7 +212,7 @@ class SGD_optimizer:
         'gamma':self.gamma}
 
     def predict(self,X):
-        return predict(X,self.beta)
+        return X @ self.beta + self.intercept
 
     def set_cost_func(self, regularization = None):
         '''
@@ -230,39 +230,17 @@ class SGD_optimizer:
         '''
         Single SGD step to updates parameters.
         '''
-        update = self.calc_deviation(X,z)
+        update = self.predict(X) - z
 
         if (self.fit_intercept):
             self.intercept -= self.lr*mean(update)
 
-        if (self.momentum):
-            
-            self.vt = self.gamma*self.vt + self.lr*self.cost_grad(X,update)
-            self.beta -= self.vt
+        if (self.momentum):    
+            self.vt = self.gamma*self.vt - self.lr*self.cost_grad(X,update)
+            self.beta += self.vt
             
         else:
             self.beta -= self.lr*self.cost_grad(X,update)
-
-
-    def momentum(self, X,z):
-        update = self.calc_deviation(X,z)
-        if (self.fit_intercept):
-            self.fit_intercept += self.lr*update
-
-        return self.gamma*self.vt + self.lr*self.cost_grad(X,update)
-
-
-    def calc_deviation(self, X, z):
-        '''
-        Calculates the deviation bewteen prediction
-        and target data.
-        '''
-
-        pred = X @ self.beta + self.intercept
-        return pred-z
-
-
-
 
     def cost_grad_l0(self, X, update):
         '''
@@ -275,7 +253,6 @@ class SGD_optimizer:
         Gradient of squared loss cost function with l2 regularizer.
         '''
         return (2/X.shape[0])*(X.T @ update) + (2/X.shape[0])*self.lmb*self.beta
-
 
     def fit_score(self,X_train, z_train, X_test, z_test):
 
