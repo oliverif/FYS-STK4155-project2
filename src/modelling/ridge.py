@@ -2,7 +2,7 @@ from numpy import linalg,eye
 from processing.data_preprocessing import center_data
 from model_evaluation.metrics import MSE
 from modelling.common import *
-from autograd import grad
+
 
 def fit_beta(X_train,z_train, lmb, fit_intercept=True):
     '''

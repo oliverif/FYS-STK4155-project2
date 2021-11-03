@@ -1,7 +1,7 @@
 from numpy import linalg, random,c_,zeros,insert
 from model_evaluation.metrics import MSE
 from processing.data_preprocessing import center_data
-from autograd import grad
+
 from sklearn.utils import shuffle
 from modelling.common import *
 

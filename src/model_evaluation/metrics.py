@@ -1,4 +1,4 @@
-from autograd.numpy import sum,mean,size
+from numpy import sum,mean,size
 
 def R2(z_data, z_model):
     '''

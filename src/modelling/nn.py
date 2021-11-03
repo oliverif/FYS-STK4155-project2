@@ -20,21 +20,22 @@ def softmax(z):
 
 ACTIVATION_FUNCS = {'sigmoid':sigmoid,'identity':identity,'relu':relu,'leakyrelu':leakyrelu,'softmax':softmax}
 
-def sigmoid_derivative(z):
+def sigmoid_derivative(z,error):
     a = sigmoid(z)
     return a*(1-a)
 
-def identity_derivative(z):
+def identity_derivative(z,error):
     return z
  
-def relu_derivative(z):
+def relu_derivative(z,error):
     return np.where(z<0,0,1)
 
-def leakyrelu_derivative(z):
+def leakyrelu_derivative(z,error):
     return np.where(z>0,1,0.01)
        
-def softmax_derivative(z):
-    return np.exp(z)/np.sum(np.exp(z),axis=0)
+def softmax_derivative(z,error):
+    a = softmax(z)
+    return a*(error-a)
 
 ACTIVATION_FUNCS_DERIVATIVE = {'sigmoid':sigmoid_derivative,
                                'identity':identity_derivative,
@@ -54,7 +55,7 @@ class Layer:
         #Biases of this layer
         self.bias = bias
         
-        #Momentum
+        #Velocities
         self.v_w = 0
         self.v_b = 0
 
@@ -78,8 +79,7 @@ class NeuralNetwork:
             w_init='uniform',
             b_init = 0.001,
             lr0 = 0.01,
-            use_momentum = True, 
-            gamma = 0.5,
+            momentum = 0.5,
             regularization = 'l2',
             lmb = 0.001, 
             ):
@@ -94,8 +94,7 @@ class NeuralNetwork:
         self.biases = [None]*(len(hidden_layer_sizes)+1)
         #self.n_inputs = X_data.shape[0]
         #self.n_features = X_data.shape[1]
-        self.use_momentum = use_momentum
-        self.gamma = gamma
+        self.momentum = momentum
         self.lr = lr0
         self.w_init = w_init
         self.b_init = b_init
@@ -230,9 +229,9 @@ class NeuralNetwork:
         weights and biases respectively.
         '''
         
-        if (self.use_momentum):    
-            layer.v_w = self.gamma*layer.v_w - self.lr*w_grad
-            layer.v_b = self.gamma*layer.v_b - self.lr*b_grad
+        if (self.momentum):    
+            layer.v_w = self.momentum*layer.v_w - self.lr*w_grad
+            layer.v_b = self.momentum*layer.v_b - self.lr*b_grad
             layer.weights += layer.v_w
             layer.bias += layer.v_b
             
