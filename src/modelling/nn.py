@@ -1,7 +1,7 @@
 from numpy import exp, random,full,matmul,zeros
-from sklearn.utils import shuffle
+from ..model_evaluation.metrics import R2, accuracy
 import numpy as np
-
+from ._sgdBase import SGD_optimizer
 
 def sigmoid(z):
     return(1/(1+np.exp(-z)))
@@ -45,10 +45,7 @@ ACTIVATION_FUNCS_DERIVATIVE = {'sigmoid':sigmoid_derivative,
 
 class Layer:
     def __init__(self, weights, bias, activation):
-        
-        #activations from previous layer, i.e current state of this Layer
-        #self.activations = zeros()
-        
+                
         #Weights of this layer
         self.weights = weights
         
@@ -59,83 +56,103 @@ class Layer:
         self.v_w = 0
         self.v_b = 0
 
+        #activate function will create class variable
+        #self.activations = activate(z_h)
         self.activate = ACTIVATION_FUNCS[activation]
         self.derivative = ACTIVATION_FUNCS_DERIVATIVE[activation]
         
         
 
 
-class NeuralNetwork:
-    bias_init = 0.01
+class NeuralNetwork(SGD_optimizer):
     def __init__(
             self,
             hidden_layer_sizes = (50,),
             hidden_activation = 'sigmoid',
             output_activation = 'identity',
             n_categories=1,
-            n_epochs=10,
-            batch_size=32,
-            schedule = 'constant',
             w_init='uniform',
             b_init = 0.001,
-            lr0 = 0.01,
-            momentum = 0.5,
             regularization = 'l2',
-            lmb = 0.001, 
+            lmb = 0.001,
+            momentum = 0.5,
+            schedule = 'constant',
+            lr0 = 0.01,
+            batch_size=32,
+            n_epochs=10,
+            t0=50, t1=300, 
+            power_t=0.05
             ):
 
-
+        super().__init__(regularization = regularization,
+                         lmb = lmb,
+                         momentum = momentum,
+                         schedule = schedule,
+                         lr0 = lr0,
+                         batch_size = batch_size,
+                         n_epochs=n_epochs,
+                         t0=t0, t1=t1, 
+                         power_t=power_t               
+                         )
         self.hidden_layer_sizes = hidden_layer_sizes
-        
-        #+1 for outputlayer
-        self.n_layers = len(hidden_layer_sizes)+1
+        self.n_layers = len(hidden_layer_sizes)+1 #+1 for outputlayer
         self.layers = [None]*(len(hidden_layer_sizes)+1)
         self.weights = [None]*(len(hidden_layer_sizes)+1)
         self.biases = [None]*(len(hidden_layer_sizes)+1)
-        #self.n_inputs = X_data.shape[0]
-        #self.n_features = X_data.shape[1]
-        self.momentum = momentum
-        self.lr = lr0
         self.w_init = w_init
         self.b_init = b_init
-        self.n_categories = n_categories
-        self.regularization = regularization
-
-        self.learning_schedule = self.const_schedule
-        
-        self.n_epochs = n_epochs
-        self.batch_size = batch_size
-        #self.iterations = self.n_inputs // self.batch_size
-        self.lr0 = lr0
-        self.lmb = lmb
-        
+        self.n_categories = n_categories        
         self.hidden_activation = hidden_activation
         self.output_activation = output_activation
 
         
-
-    def initalize_layers(self,input_shape):
+    def initialize(self,input_shape):
         '''
         Initializes layers given input shape. Used
         when fit is called.
         '''
         self.n_samples,self.n_features = input_shape
-        
         prev_shape = (self.hidden_layer_sizes[0],input_shape[1])
-
         for layer,neurons in enumerate(self.hidden_layer_sizes):
-            w = self.init_w(prev_shape[1],neurons)
-            b = self.init_b(neurons)
+            w = self._init_w(prev_shape[1],neurons)
+            b = self._init_b(neurons)
             self.layers[layer] = Layer(w,b,self.hidden_activation)
-
             prev_shape = w.shape
          
         #Adding output layer   
-        w = self.init_w(prev_shape[1],self.n_categories)
-        b = self.init_b(self.n_categories)
+        w = self._init_w(prev_shape[1],self.n_categories)
+        b = self._init_b(self.n_categories)
         self.layers[-1] = Layer(w,b,self.output_activation)
-                 
-    def init_w(self,n_features,n_neurons):
+  
+    def partial_fit(self,X,z):
+        '''
+        Performs a single SGD step for neural network
+        and updates weights and biases accordingly.
+        '''
+        self._feed_forward(X)
+        self._backpropagation(X,z)
+    
+    def score(self,X,z):
+        '''
+        Returns the coefficient of determination(R2) for the prediction if
+        NN is regressor.
+        Returns the mean accuracy of the prediction if NN is classifier.
+        '''
+        p = self.predict(X)
+        if (self.output_activation == 'identity'):
+            return R2(z,p)
+        
+        return accuracy(z,p)
+    
+    def predict(self,X):
+        '''
+        Feeds input forward to produce
+        output of network.
+        Predicts output based on X.
+        '''
+        return self._fast_feed_forward(X)
+                     
+    def _init_w(self,n_features,n_neurons):
         if (self.w_init=='normal'):
             return random.randn(n_features, n_neurons)
         elif(self.w_init=='uniform'):
@@ -144,10 +161,10 @@ class NeuralNetwork:
             limit = np.sqrt(6.0/(n_features+n_neurons))
             return random.uniform(-limit,limit,(n_features, n_neurons))
     
-    def init_b(self,lenght):
+    def _init_b(self,lenght):
         return full(lenght,self.b_init)
     
-    def feed_forward(self,X):
+    def _feed_forward(self,X):
         '''
         Feeds X forward in the network and 
         stores each activations in the layers
@@ -167,7 +184,7 @@ class NeuralNetwork:
             #Set activation as input for next iteration
             #a = layer.activations
     
-    def fast_feed_forward(self,X):    
+    def _fast_feed_forward(self,X):    
         '''
         Feeds X forward in the network and
         returns output layer activation
@@ -185,50 +202,39 @@ class NeuralNetwork:
 
         return a
     
-    def backpropagation(self,X,z):
-        
-        #Feed forward to update layer activations
-        self.feed_forward(X)
-        
+    def _backpropagation(self,X,z):
+        '''
+        Performs backpropagation across the entire
+        network.
+        This function updates
+        ''' 
         #Do last layer first
         error = self.layers[-1].activations - z
-
-        #Store weights for next layer
-        weights = self.layers[-1].weights
-
-
+        weights = self.layers[-1].weights #Store weights for next layer
         w_grad, b_grad = self._calc_grads(weights,self.layers[-2].activations, error)
-
         self._update_weights_and_biases(self.layers[-1],w_grad,b_grad)
         
+        #Do hidden layers
         for i in range(len(self.layers)-2,0,-1):
-
             #Next layer error
-            #error = matmul(error, weights.T)*self.layers[i].derivative(self.layers[i].z_h)
-            error = (error @ weights.T)*self.layers[i].derivative(self.layers[i].z_h)
-            #Store weights for next iteration
-            weights = self.layers[i].weights
-
-            w_grad, b_grad = self._calc_grads(weights,self.layers[i-1].activations, error)
-            
+            error = (error @ weights.T)*self.layers[i].derivative(self.layers[i].z_h,error)     
+            weights = self.layers[i].weights #Store weights for next iteration
+            w_grad, b_grad = self._calc_grads(weights,self.layers[i-1].activations, error) 
             #Back propagate one step
             self._update_weights_and_biases(self.layers[i],w_grad,b_grad)
-            
-            
-        #First layer
-        error = matmul(error, weights.T)*self.layers[0].derivative(self.layers[0].z_h)
+                 
+        #Do first layer
+        error = matmul(error, weights.T)*self.layers[0].derivative(self.layers[0].z_h,error)
         w_grad, b_grad = self._calc_grads(self.layers[0].weights, X, error)
         self._update_weights_and_biases(self.layers[0],w_grad,b_grad)
-     
-     
+       
     def _update_weights_and_biases(self,layer,w_grad,b_grad):
         '''
         Updates the weights and biases of layer.
         Either updates with momentum or simply
         subtracts w_grad and b_grad from
         weights and biases respectively.
-        '''
-        
+        '''  
         if (self.momentum):    
             layer.v_w = self.momentum*layer.v_w - self.lr*w_grad
             layer.v_b = self.momentum*layer.v_b - self.lr*b_grad
@@ -238,98 +244,21 @@ class NeuralNetwork:
         else:
             layer.weights -=  self.lr*w_grad
             layer.bias -=  self.lr*b_grad
-         
-       
+             
     def _calc_grads(self,current_layer_w,prev_layer_a, error):
-        #Calculate weights and biases gradients
+        '''
+        Calculates the gradients for current_layer's
+        weights and biases.
+        '''
         w_grad = matmul(prev_layer_a.T,error)
         b_grad = np.mean(error,axis=0)
-
-
         #Add l2 regularization if specified
         if(self.regularization=='l2'):
             w_grad += self.lmb * current_layer_w
         
-        w_grad /=self.batch_size
-        
+        w_grad /=self.batch_size       
         return w_grad,b_grad
 
 
-    def calc_weight_grad(self,activations,error):
 
-        return matmul(activations.T,error)
-   
-   
-   
-    def decaying_schedule(self,t):
-        '''
-        Decaing schedule for learning rate.
-        '''
-        self.lr = self.t0/(t+self.t1)
-
-    def invscaling_schedule(self,t):
-        self.lr = self.lr0/pow(t+1,self.power_t)
-
-    def const_schedule(self,t):
-        '''
-        Constant schedule(i.e no schedule) for learning rate.
-        '''
-        pass
-    
-    def fit(self,X_train,z_train,batch_size = None, n_epochs = None):
-        '''
-        Performs mini-batch stochastic gradient 
-        descent optimization and stores resulting
-        weights and biases in Layers. 
-        AKA train model using X_train and z_train.
-        '''
-        #Set batch size and epochs if given
-        if (batch_size is not None):
-            self.set_batch_size(batch_size)
-        if(n_epochs is not None):
-            self.set_n_epochs(n_epochs)
-
-
-        #Initialize layers
-        self.initalize_layers(X_train.shape)
-
-        #Reset momentum
-        self.vt = 0
-
-        #The number of batches is calculated from batch size.
-        n_batches = int(z_train.shape[0]/self.batch_size)
-
-        for epoch in range(self.n_epochs):
-            for batch in range(n_batches):
-                #Select a random batch
-                xi,zi = self.select_batch(X_train,z_train)
-
-                #Update lr according to schedule
-                self.learning_schedule(epoch*n_batches+batch)
-
-                #Update weights
-                self.backpropagation(xi,zi)
-
-            #Shuffle training data for next round
-            X_train,z_train = shuffle(X_train,z_train)
-
-        return self
-
-    
-    def select_batch(self, X_train, z_train):
-        '''
-        Selects a random batch from X_train and z_train with
-        batch_size amount of data points.
-        '''
-        randi = random.randint(z_train.shape[0]/self.batch_size) #choose a random batch
-        xi = X_train[randi*self.batch_size : randi*self.batch_size+self.batch_size]
-        zi = z_train[randi*self.batch_size : randi*self.batch_size+self.batch_size]
-        return xi, zi
-    
-    def predict(self,X):
-        
-        return self.fast_feed_forward(X)
-     
-    def set_n_epochs(self,n_epochs):
-        self.n_epochs = n_epochs
 

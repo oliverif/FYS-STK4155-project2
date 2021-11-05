@@ -1,65 +1,64 @@
+from abc import abstractproperty
 from modelling.ols import fit_beta
 from numpy import random,mean, sum,zeros
 from sklearn.utils import shuffle
 from processing.data_preprocessing import center_data
 from model_evaluation.metrics import MSE, R2
 from modelling.common import predict
+from abc import ABCMeta,abstractmethod
 
 
-class SGD_optimizer:
-    t0 = 50
-    t1 = 300
+
+
+class SGD_optimizer(object):
     
-    power_t = 0.05
-    
-    mse = 0
-    r2 = 0
 
     def __init__(self,
                  regularization = 'l2',
                  lmb = 0.001, 
-                 fit_intercept = False, 
                  momentum = 0.5,
                  schedule = 'constant',
                  lr0 = 0.01,
-                 batch_size=32,
-                 n_epochs=10):
+                 batch_size=None,
+                 n_epochs=None,
+                 t0 = 50,t1 = 300, 
+                 power_t = 0.05,  
+                 ):
         
         self.regularization = regularization
         self.lmb = lmb
 
         self.momentum = momentum
 
-        self.lr0 = lr0
-        
+        self.lr0 = lr0       
         self.schedule = schedule
-        self.vt = 0
 
         self.batch_size = batch_size
         self.n_epochs = n_epochs
-        self.intercept = 0
-        self.fit_intercept = fit_intercept
-
 
         self.learning_schedule = self.set_schedule()
-        self.cost_grad = self.set_cost_func()
 
+        self.t0 = t0
+        self.t1 = t1
+        self.power_t = power_t
+        
         self.param_setters = {'lmb':self.set_lmb,
-                              'regularization':self.set_cost_func,
-                              'fit_intercept':self.set_fit_intercept,
+                              'regularization':self.set_regularization,
                               'batch_size':self.set_batch_size,
                               'n_epochs':self.set_n_epochs,
                               'lr':self.set_lr,
+                              'lr0':self.set_lr0,
                               'momentum':self.set_momentum}
         
+    @abstractmethod
+    def initialize(self,shape):
+        '''Initialize weights, biases and or other paremeters'''
 
 
     def fit(self,X_train, z_train, batch_size = None, n_epochs = None):
         '''
         Performs mini-batch stochastic gradient 
-        descent optimization and stores resulting
-        parameters in self.beta. AKA train model using X_train and
-        z_train.
+        descent optimization.
         '''
         #Set batch size and epochs if given
         if (batch_size is not None):
@@ -67,17 +66,8 @@ class SGD_optimizer:
         if(n_epochs is not None):
             self.set_n_epochs(n_epochs)
 
-        if(self.fit_intercept):
-            self.intercept = 1
-
-        #Initalize beta to random values
-        #self.beta = random.randn(X_train.shape[1],1)
-
-        #Initialize beta to zeros
-        self.beta = zeros(X_train.shape[1]).reshape(-1,1)
-
-        #Reset momentum
-        self.vt = 0
+        #Initialize parameters
+        self.initialize(X_train.shape)
 
         #The number of batches is calculated from batch size.
         n_batches = int(z_train.shape[0]/self.batch_size)
@@ -125,6 +115,12 @@ class SGD_optimizer:
         Sets the learning rate
         '''
         self.lr = lr
+
+    def set_lr0(self, lr0):
+        self.lr0 = lr0
+
+    def set_regularization(self, regularization):
+        self.regularization = regularization
 
     def set_lmb(self,lmb):
         '''
@@ -184,78 +180,20 @@ class SGD_optimizer:
         zi = z_train[randi*self.batch_size : randi*self.batch_size+self.batch_size]
         return xi, zi
 
-
-
-    def set_fit_intercept(self,fit_intercept):
-        self.fit_intercept = fit_intercept
-
+    @abstractmethod
     def score(self,X,z):
-        '''
-        Calculates the scores for this model
-        '''
-        z_tilde = predict(X,self.beta)
-        self.mse = MSE(z,z_tilde)
-        self.r2 = R2(z,z_tilde)
-
-        return self.mse
-
+        '''Calculates the scores'''
+        
+    @abstractmethod
     def get_params(self, deep=True):
-        return {'lmb':self.lmb,
-        'regularization':self.regularization,
-        'fit_intercept':self.fit_intercept,
-        'batch_size':self.batch_size,
-        'n_epochs':self.n_epochs,
-        'lr':self.lr,
-        'momentum':self.momentum}
+        '''Gets parameters'''
 
+    @abstractmethod
     def predict(self,X):
-        return X @ self.beta + self.intercept
-
-    def set_cost_func(self, regularization = None):
-        '''
-        Defines the cost function to be used during optimization
-        '''
-        if (regularization is not None):
-            self.regularization = regularization
-
-        if (self.regularization == 'l2'):
-            return self.cost_grad_l2
-        else:
-            return self.cost_grad_l0
+        '''Predict output from X'''
       
+    @abstractmethod
     def partial_fit(self,X,z):
-        '''
-        Single SGD step to updates parameters.
-        '''
-        update = self.predict(X) - z
-
-        if (self.fit_intercept):
-            self.intercept -= self.lr*mean(update)
-
-        if (self.momentum):    
-            self.vt = self.momentum*self.vt - self.lr*self.cost_grad(X,update)
-            self.beta += self.vt
-            
-        else:
-            self.beta -= self.lr*self.cost_grad(X,update)
-
-    def cost_grad_l0(self, X, update):
-        '''
-        Gradient of squared loss cost function.
-        '''
-        return (1/X.shape[0])*(X.T @ update)
-
-    def cost_grad_l2(self, X, update):
-        '''
-        Gradient of squared loss cost function with l2 regularizer.
-        '''
-        return (2/X.shape[0])*(X.T @ update) + (2/X.shape[0])*self.lmb*self.beta
-
-    def fit_score(self,X_train, z_train, X_test, z_test):
-
-        self.fit(X_train,z_train)
-        self.score(X_train,z_train)
-        z_pred = predict(X_test,self.beta)
-
-        return self.mse, MSE(z_test,z_pred), self.r2, R2(z_test,z_pred)
+        '''Single SGD step to updates parameters.'''
+        
 

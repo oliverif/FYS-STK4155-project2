@@ -13,28 +13,29 @@ def relu(z):
     return np.maximum(z,0)
 
 def leakyrelu(z):
-    return np.where(z>0,z,0.001*z)
+    return np.where(z>=0,z,0.01*z)
        
 def softmax(z):
     return np.exp(z)/np.sum(np.exp(z),axis=0)
 
 ACTIVATION_FUNCS = {'sigmoid':sigmoid,'identity':identity,'relu':relu,'leakyrelu':leakyrelu,'softmax':softmax}
 
-def sigmoid_derivative(z):
+def sigmoid_derivative(z,error):
     a = sigmoid(z)
     return a*(1-a)
 
-def identity_derivative(z):
+def identity_derivative(z,error):
     return z
  
-def relu_derivative(z):
-    return np.where(z>0,1,0)
+def relu_derivative(z,error):
+    return np.where(z<0,0,1)
 
-def leakyrelu_derivative(z):
-    return np.where(z>0,1,0.001)
+def leakyrelu_derivative(z,error):
+    return np.where(z>0,1,0.01)
        
-def softmax_derivative(z):
-    return np.exp(z)/np.sum(np.exp(z),axis=0)
+def softmax_derivative(z,error):
+    a = softmax(z)
+    return a*(error-a)
 
 ACTIVATION_FUNCS_DERIVATIVE = {'sigmoid':sigmoid_derivative,
                                'identity':identity_derivative,
@@ -54,7 +55,7 @@ class Layer:
         #Biases of this layer
         self.bias = bias
         
-        #Momentum
+        #Velocities
         self.v_w = 0
         self.v_b = 0
 
@@ -75,11 +76,12 @@ class NeuralNetwork:
             n_epochs=10,
             batch_size=32,
             schedule = 'constant',
+            w_init='uniform',
+            b_init = 0.001,
             lr0 = 0.01,
-            use_momentum = True, 
-            gamma = 0.5,
+            momentum = 0.5,
             regularization = 'l2',
-            lmb = 0.0001, 
+            lmb = 0.001, 
             ):
 
 
@@ -92,10 +94,10 @@ class NeuralNetwork:
         self.biases = [None]*(len(hidden_layer_sizes)+1)
         #self.n_inputs = X_data.shape[0]
         #self.n_features = X_data.shape[1]
-        self.use_momentum = use_momentum
-        self.gamma = gamma
+        self.momentum = momentum
         self.lr = lr0
-        
+        self.w_init = w_init
+        self.b_init = b_init
         self.n_categories = n_categories
         self.regularization = regularization
 
@@ -112,7 +114,7 @@ class NeuralNetwork:
 
         
 
-    def initalize_layers(self,input_shape):
+    def initalize(self,input_shape):
         '''
         Initializes layers given input shape. Used
         when fit is called.
@@ -122,24 +124,30 @@ class NeuralNetwork:
         prev_shape = (self.hidden_layer_sizes[0],input_shape[1])
 
         for layer,neurons in enumerate(self.hidden_layer_sizes):
-            w = self.init_w(prev_shape[1],neurons)
-            b = self.init_b(neurons)
+            w = self._init_w(prev_shape[1],neurons)
+            b = self._init_b(neurons)
             self.layers[layer] = Layer(w,b,self.hidden_activation)
 
             prev_shape = w.shape
          
         #Adding output layer   
-        w = self.init_w(prev_shape[1],self.n_categories)
-        b = self.init_b(self.n_categories)
+        w = self._init_w(prev_shape[1],self.n_categories)
+        b = self._init_b(self.n_categories)
         self.layers[-1] = Layer(w,b,self.output_activation)
                  
-    def init_w(self,n_features,n_neurons):
-        return random.randn(n_features, n_neurons)
+    def _init_w(self,n_features,n_neurons):
+        if (self.w_init=='normal'):
+            return random.randn(n_features, n_neurons)
+        elif(self.w_init=='uniform'):
+            return random.uniform(0,1,(n_features, n_neurons))
+        elif(self.w_init =='glorot'):
+            limit = np.sqrt(6.0/(n_features+n_neurons))
+            return random.uniform(-limit,limit,(n_features, n_neurons))
     
-    def init_b(self,lenght):
-        return full(lenght,self.bias_init)
+    def _init_b(self,lenght):
+        return full(lenght,self.b_init)
     
-    def feed_forward(self,X):
+    def _feed_forward(self,X):
         '''
         Feeds X forward in the network and 
         stores each activations in the layers
@@ -153,12 +161,13 @@ class NeuralNetwork:
             
             #Store activations in layer object
             layer.activations = layer.activate(layer.z_h)
+
             a = layer.activations
             
             #Set activation as input for next iteration
             #a = layer.activations
     
-    def fast_feed_forwards(self,X):    
+    def _fast_feed_forward(self,X):    
         '''
         Feeds X forward in the network and
         returns output layer activation
@@ -176,10 +185,10 @@ class NeuralNetwork:
 
         return a
     
-    def backpropagation(self,X,z):
+    def _backpropagation(self,X,z):
         
         #Feed forward to update layer activations
-        self.feed_forward(X)
+        self._feed_forward(X)
         
         #Do last layer first
         error = self.layers[-1].activations - z
@@ -187,22 +196,27 @@ class NeuralNetwork:
         #Store weights for next layer
         weights = self.layers[-1].weights
 
+
         w_grad, b_grad = self._calc_grads(weights,self.layers[-2].activations, error)
+
         self._update_weights_and_biases(self.layers[-1],w_grad,b_grad)
         
         for i in range(len(self.layers)-2,0,-1):
+
             #Next layer error
-            error = matmul(error, weights.T)*self.layers[i].derivative(self.layers[i].z_h)
+            #error = matmul(error, weights.T)*self.layers[i].derivative(self.layers[i].z_h)
+            error = (error @ weights.T)*self.layers[i].derivative(self.layers[i].z_h,error)
             #Store weights for next iteration
             weights = self.layers[i].weights
 
             w_grad, b_grad = self._calc_grads(weights,self.layers[i-1].activations, error)
+            
             #Back propagate one step
             self._update_weights_and_biases(self.layers[i],w_grad,b_grad)
             
             
         #First layer
-        error = matmul(error, weights.T)*self.layers[0].activations*(1-self.layers[0].activations)
+        error = matmul(error, weights.T)*self.layers[0].derivative(self.layers[0].z_h,error)
         w_grad, b_grad = self._calc_grads(self.layers[0].weights, X, error)
         self._update_weights_and_biases(self.layers[0],w_grad,b_grad)
      
@@ -215,27 +229,28 @@ class NeuralNetwork:
         weights and biases respectively.
         '''
         
-        if (self.use_momentum):    
-            layer.v_w = self.gamma*layer.v_w + self.lr*w_grad
-            layer.v_b = self.gamma*layer.v_b + self.lr*b_grad
-            layer.weights -= layer.v_w
-            layer.bias -= layer.v_b
+        if (self.momentum):    
+            layer.v_w = self.momentum*layer.v_w - self.lr*w_grad
+            layer.v_b = self.momentum*layer.v_b - self.lr*b_grad
+            layer.weights += layer.v_w
+            layer.bias += layer.v_b
             
         else:
-            layer.weights -= w_grad
-            layer.bias -= b_grad
+            layer.weights -=  self.lr*w_grad
+            layer.bias -=  self.lr*b_grad
          
        
     def _calc_grads(self,current_layer_w,prev_layer_a, error):
         #Calculate weights and biases gradients
         w_grad = matmul(prev_layer_a.T,error)
-        b_grad = np.sum(error,axis=0)
+        b_grad = np.mean(error,axis=0)
+
 
         #Add l2 regularization if specified
         if(self.regularization=='l2'):
             w_grad += self.lmb * current_layer_w
         
-        w_grad /=self.n_samples
+        w_grad /=self.batch_size
         
         return w_grad,b_grad
 
@@ -276,7 +291,7 @@ class NeuralNetwork:
 
 
         #Initialize layers
-        self.initalize_layers(X_train.shape)
+        self.initalize(X_train.shape)
 
         #Reset momentum
         self.vt = 0
@@ -293,7 +308,7 @@ class NeuralNetwork:
                 self.learning_schedule(epoch*n_batches+batch)
 
                 #Update weights
-                self.backpropagation(xi,zi)
+                self._backpropagation(xi,zi)
 
             #Shuffle training data for next round
             X_train,z_train = shuffle(X_train,z_train)
@@ -313,7 +328,7 @@ class NeuralNetwork:
     
     def predict(self,X):
         
-        return self.fast_feed_forwards(X)
+        return self._fast_feed_forward(X)
      
     def set_n_epochs(self,n_epochs):
         self.n_epochs = n_epochs

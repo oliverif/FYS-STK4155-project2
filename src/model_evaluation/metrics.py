@@ -1,22 +1,30 @@
 from numpy import sum,mean,size
 
-def R2(z_data, z_model):
+def R2(target, prediction):
     '''
-    Returns the R2 score for z_data and z_model
+    Returns the R2 score of prediction compared
+    to target.
     '''
-    return 1 - sum((z_data - z_model) ** 2) / sum((z_data - mean(z_data)) ** 2)
+    return 1 - sum((target - prediction) ** 2) / sum((target - mean(target)) ** 2)
 
-def MSE(z_data,z_model):
+def MSE(target, prediction):
     '''
-    Returns the MSE for z_data and z_model
+    Returns the MSE of prediction compared 
+    to target.
     '''
-    n = size(z_model)
-    return sum((z_data-z_model)**2)/n
+    n = size(prediction)
+    return sum((target-prediction)**2)/n
 
-def scores(z_data,z_model):
+def accuracy(target, prediction):
     '''
-    Returns the MSE and R2 scole for z_data and z_model
+    Returns the accuracy score of prediction compared
+    to target.
     '''
-    return MSE(z_data,z_model),R2(z_data,z_model)
+    return sum(prediction==target)/len(target)
 
+def scores(target,prediction):
+    '''
+    Returns the MSE and R2 score for target and prediction
+    '''
+    return MSE(target,prediction),R2(target,prediction)
 
