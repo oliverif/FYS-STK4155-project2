@@ -1,5 +1,7 @@
-from modelling.sgd import SGD_optimizer
 from numpy import zeros
+from sklearn.model_selection import GridSearchCV
+import pandas as pd
+
 def evaluate_parameter(X_train, z_train, X_test, z_test, param, vals, sgd):
     '''
     Fits an sgd optimizer using for every 
@@ -43,3 +45,20 @@ def evaluate_parameter(X_train, z_train, X_test, z_test, param, vals, sgd):
     return mse_train, mse_test, r2_train, r2_test
 
     
+def grid_search_df(X, z, model, param_grid):
+    '''
+    Performs a grid search for best model
+    performance across param_grid. 
+    Funcion wraps sklearn GridSearchCV and
+    outputs more readable results.
+    '''
+    gs = GridSearchCV(estimator = model, 
+                      param_grid = param_grid,
+                      n_jobs=-1)
+    gs = gs.fit(X,z)
+    param_strs =['param_'+s for s in list(param_grid.keys())]
+    data = {k[6:]: gs.cv_results_[k] for k in (param_strs)}
+    data['mean_test_score'] = gs.cv_results_['mean_test_score']
+    data['rank_test_score'] = gs.cv_results_['rank_test_score']
+
+    return gs, pd.DataFrame(data)

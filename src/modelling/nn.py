@@ -2,46 +2,7 @@ from numpy import exp, random,full,matmul,zeros
 from ..model_evaluation.metrics import R2, accuracy
 import numpy as np
 from ._sgdBase import SGD_optimizer
-
-def sigmoid(z):
-    return(1/(1+np.exp(-z)))
-
-def identity(z):
-    return z
- 
-def relu(z):
-    return np.maximum(z,0)
-
-def leakyrelu(z):
-    return np.where(z>=0,z,0.01*z)
-       
-def softmax(z):
-    return np.exp(z)/np.sum(np.exp(z),axis=0)
-
-ACTIVATION_FUNCS = {'sigmoid':sigmoid,'identity':identity,'relu':relu,'leakyrelu':leakyrelu,'softmax':softmax}
-
-def sigmoid_derivative(z,error):
-    a = sigmoid(z)
-    return a*(1-a)
-
-def identity_derivative(z,error):
-    return z
- 
-def relu_derivative(z,error):
-    return np.where(z<0,0,1)
-
-def leakyrelu_derivative(z,error):
-    return np.where(z>0,1,0.01)
-       
-def softmax_derivative(z,error):
-    a = softmax(z)
-    return a*(error-a)
-
-ACTIVATION_FUNCS_DERIVATIVE = {'sigmoid':sigmoid_derivative,
-                               'identity':identity_derivative,
-                               'relu':relu_derivative,
-                               'leakyrelu':leakyrelu_derivative,
-                               'softmax':softmax_derivative}
+from ._functions import ACTIVATION_FUNCS, ACTIVATION_FUNCS_DERIVATIVE
 
 class Layer:
     def __init__(self, weights, bias, activation):
@@ -68,31 +29,35 @@ class NeuralNetwork(SGD_optimizer):
     def __init__(
             self,
             hidden_layer_sizes = (50,),
-            hidden_activation = 'sigmoid',
-            output_activation = 'identity',
+            hidden_activation = 'relu',
+            output_activation = 'sigmoid',
             n_categories=1,
-            w_init='uniform',
+            w_init='glorot',
             b_init = 0.001,
+            loss_func = 'cross_entropy',
             regularization = 'l2',
             lmb = 0.001,
             momentum = 0.5,
             schedule = 'constant',
             lr0 = 0.01,
             batch_size=32,
-            n_epochs=10,
+            n_epochs=100,
             t0=50, t1=300, 
-            power_t=0.05
+            power_t=0.05,
+            val_fraction=0.1
             ):
 
-        super().__init__(regularization = regularization,
+        super().__init__(loss_func = loss_func,
+                         regularization = regularization,
                          lmb = lmb,
                          momentum = momentum,
                          schedule = schedule,
                          lr0 = lr0,
                          batch_size = batch_size,
-                         n_epochs=n_epochs,
-                         t0=t0, t1=t1, 
-                         power_t=power_t               
+                         n_epochs = n_epochs,
+                         t0 = t0, t1 = t1, 
+                         power_t = power_t,
+                         val_fraction=val_fraction               
                          )
         self.hidden_layer_sizes = hidden_layer_sizes
         self.n_layers = len(hidden_layer_sizes)+1 #+1 for outputlayer
@@ -104,13 +69,19 @@ class NeuralNetwork(SGD_optimizer):
         self.n_categories = n_categories        
         self.hidden_activation = hidden_activation
         self.output_activation = output_activation
-
+        #Store model parameters in list for easy access
+        #Enables the use of SKlearn CVGridsearch
+        new_params = ['hidden_layer_sizes',
+                      'hidden_activation',
+                      'output_activation']     
+        self.params += new_params
         
     def initialize(self,input_shape):
         '''
         Initializes layers given input shape. Used
         when fit is called.
         '''
+        self.lr = self.lr0
         self.n_samples,self.n_features = input_shape
         prev_shape = (self.hidden_layer_sizes[0],input_shape[1])
         for layer,neurons in enumerate(self.hidden_layer_sizes):
@@ -129,8 +100,14 @@ class NeuralNetwork(SGD_optimizer):
         Performs a single SGD step for neural network
         and updates weights and biases accordingly.
         '''
-        self._feed_forward(X)
+        p = self._feed_forward(X)
         self._backpropagation(X,z)
+        loss = self.loss_func(z,p)
+        if(self.regularization == 'l2'):
+            for layer in self.layers:
+                w = layer.weights.ravel()
+                loss += self.lmb * w @ w / (2*X.shape[0])             
+        return loss
     
     def score(self,X,z):
         '''
@@ -139,6 +116,8 @@ class NeuralNetwork(SGD_optimizer):
         Returns the mean accuracy of the prediction if NN is classifier.
         '''
         p = self.predict(X)
+        if(len(z.shape)==1):
+            z = z.reshape(-1,1)        
         if (self.output_activation == 'identity'):
             return R2(z,p)
         
@@ -149,6 +128,16 @@ class NeuralNetwork(SGD_optimizer):
         Feeds input forward to produce
         output of network.
         Predicts output based on X.
+        '''
+        p = self._fast_feed_forward(X)
+        if(self.output_activation=='linear'):
+            return p
+        return np.where(p<0.5,0,1)
+    
+    def predict_continuous(self,X):
+        '''
+        Outputs the prediction with continuous
+        values. AKA predicts probabilities.
         '''
         return self._fast_feed_forward(X)
                      
@@ -170,19 +159,15 @@ class NeuralNetwork(SGD_optimizer):
         stores each activations in the layers
         '''
         a = X
-
         for layer in self.layers:
-
-            #Weighted sum
+            #Weighted sumjh
             layer.z_h = matmul(a,layer.weights) + layer.bias
-            
             #Store activations in layer object
             layer.activations = layer.activate(layer.z_h)
-
-            a = layer.activations
-            
             #Set activation as input for next iteration
-            #a = layer.activations
+            a = layer.activations
+
+        return a
     
     def _fast_feed_forward(self,X):    
         '''
@@ -193,13 +178,10 @@ class NeuralNetwork(SGD_optimizer):
         a = X
         for layer in self.layers:
             #Weighted sum
-            z_h = matmul(a,layer.weights) + layer.bias
-            
-            #Store activations in layer object
+            z_h = matmul(a,layer.weights) + layer.bias            
+            #Set activation as input for next iteration
             a = layer.activate(z_h)
             
-            #Set activation as input for next iteration
-
         return a
     
     def _backpropagation(self,X,z):
@@ -259,6 +241,5 @@ class NeuralNetwork(SGD_optimizer):
         w_grad /=self.batch_size       
         return w_grad,b_grad
 
-
-
+ 
 

@@ -1,12 +1,8 @@
-from abc import abstractproperty
-from modelling.ols import fit_beta
-from numpy import random,mean, sum,zeros
+from numpy import random, mean
 from sklearn.utils import shuffle
-from processing.data_preprocessing import center_data
-from model_evaluation.metrics import MSE, R2
-from modelling.common import predict
-from abc import ABCMeta,abstractmethod
-
+from sklearn.model_selection import train_test_split
+from abc import abstractmethod
+from ._functions import LOSS_FUNCS
 
 
 
@@ -14,48 +10,53 @@ class SGD_optimizer(object):
     
 
     def __init__(self,
-                 regularization = 'l2',
-                 lmb = 0.001, 
-                 momentum = 0.5,
-                 schedule = 'constant',
-                 lr0 = 0.01,
-                 batch_size=None,
-                 n_epochs=None,
-                 t0 = 50,t1 = 300, 
-                 power_t = 0.05,  
+                 loss_func,
+                 regularization,
+                 lmb, 
+                 momentum,
+                 schedule,
+                 lr0,
+                 batch_size,
+                 n_epochs,
+                 t0,t1, 
+                 power_t,
+                 val_fraction  
                  ):
-        
+        self.loss_func = LOSS_FUNCS[loss_func]
         self.regularization = regularization
         self.lmb = lmb
-
         self.momentum = momentum
-
-        self.lr0 = lr0       
+        self.lr0 = lr0
+        self.lr = lr0       
         self.schedule = schedule
-
         self.batch_size = batch_size
         self.n_epochs = n_epochs
-
         self.learning_schedule = self.set_schedule()
-
         self.t0 = t0
         self.t1 = t1
         self.power_t = power_t
-        
-        self.param_setters = {'lmb':self.set_lmb,
-                              'regularization':self.set_regularization,
-                              'batch_size':self.set_batch_size,
-                              'n_epochs':self.set_n_epochs,
-                              'lr':self.set_lr,
-                              'lr0':self.set_lr0,
-                              'momentum':self.set_momentum}
+        self.val_fraction = val_fraction 
+        self.scores = []
+        self.loss = []
+        self.val_scores = []
+        self.val_loss = []
+        self.params = ['regularization',
+                       'lmb',
+                       'momentum',
+                       'schedule',
+                       'lr0',
+                       'batch_size',
+                       'n_epochs',
+                       't0', 
+                       'power_t' 
+                       ]
         
     @abstractmethod
     def initialize(self,shape):
         '''Initialize weights, biases and or other paremeters'''
 
 
-    def fit(self,X_train, z_train, batch_size = None, n_epochs = None):
+    def fit(self,X, z, batch_size = None, n_epochs = None):
         '''
         Performs mini-batch stochastic gradient 
         descent optimization.
@@ -64,36 +65,57 @@ class SGD_optimizer(object):
         if (batch_size is not None):
             self.set_batch_size(batch_size)
         if(n_epochs is not None):
-            self.set_n_epochs(n_epochs)
+            self.set_n_epochs(n_epochs)        
+        #Ensure correct shape  
+        if(len(z.shape) == 1):
+            z = z.reshape(-1,1)         
+        #Split data into train and validation if val_fraction > 0
+        if (self.val_fraction>0):
+            X, X_val, z, z_val = train_test_split(X,z,test_size=self.val_fraction)
 
+        
         #Initialize parameters
-        self.initialize(X_train.shape)
+        self.initialize(X.shape)
 
         #The number of batches is calculated from batch size.
-        n_batches = int(z_train.shape[0]/self.batch_size)
+        n_batches = int(z.shape[0]/self.batch_size)
 
         for epoch in range(self.n_epochs):
+            running_loss = 0
             for batch in range(n_batches):
                 #Select a random batch
-                xi,zi = self.select_batch(X_train,z_train)
-
+                xi,zi = self.select_batch(X,z)
                 #Update lr according to schedule
                 self.learning_schedule(epoch*n_batches+batch)
-
-                #Update parameters
-                self.partial_fit(xi,zi)
-
+                #Update parameters and capture loss
+                running_loss += self.partial_fit(xi,zi)*(xi.shape[0])
+                            
+            #Calculate score and loss after epoch and store it
+            self.loss.append(running_loss/X.shape[0])
+            self.scores.append(self.score(X,z))
+            if(self.val_fraction>0):
+                p = self.predict_continuous(X_val)
+                self.val_loss.append(self.loss_func(z_val,p))
+                self.val_scores.append(self.score(X_val,z_val))
             #Shuffle training data for next round
-            X_train,z_train = shuffle(X_train,z_train)
-
+            X,z = shuffle(X,z)
         return self
 
-    def set_params(self,**params):
-
-        for key, val in params.items():
-            self.param_setters[key](val)
-
+    #what
+    def set_params(self,**new_params):
+        '''
+        Sets one or more parameters
+        contained in dictionarey params
+        '''
+        for key, val in new_params.items():
+            setattr(self,key,val)
         return self
+ 
+
+    def get_params(self, deep=True):
+        '''Gets parameters'''
+        return {param:getattr(self,param) for param in self.params}
+
  
     def set_n_epochs(self,n_epochs):
         '''
@@ -109,12 +131,6 @@ class SGD_optimizer(object):
 
     def set_momentum(self,momentum):
         self.momentum = momentum
-
-    def set_lr(self, lr):
-        '''
-        Sets the learning rate
-        '''
-        self.lr = lr
 
     def set_lr0(self, lr0):
         self.lr0 = lr0
@@ -170,14 +186,14 @@ class SGD_optimizer(object):
         '''
         pass
 
-    def select_batch(self, X_train, z_train):
+    def select_batch(self, X, z):
         '''
-        Selects a random batch from X_train and z_train with
+        Selects a random batch from X and z with
         batch_size amount of data points.
         '''
-        randi = random.randint(z_train.shape[0]/self.batch_size) #choose a random batch
-        xi = X_train[randi*self.batch_size : randi*self.batch_size+self.batch_size]
-        zi = z_train[randi*self.batch_size : randi*self.batch_size+self.batch_size]
+        randi = random.randint(z.shape[0]/self.batch_size) #choose a random batch
+        xi = X[randi*self.batch_size : randi*self.batch_size+self.batch_size]
+        zi = z[randi*self.batch_size : randi*self.batch_size+self.batch_size]
         return xi, zi
 
     @abstractmethod
@@ -185,15 +201,14 @@ class SGD_optimizer(object):
         '''Calculates the scores'''
         
     @abstractmethod
-    def get_params(self, deep=True):
-        '''Gets parameters'''
-
-    @abstractmethod
     def predict(self,X):
         '''Predict output from X'''
       
     @abstractmethod
+    def predict_continuous(self,X):
+        '''Predict continous output from X'''
+            
+    @abstractmethod
     def partial_fit(self,X,z):
         '''Single SGD step to updates parameters.'''
         
-

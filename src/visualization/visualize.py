@@ -3,9 +3,12 @@ from mpl_toolkits.mplot3d import Axes3D
 from matplotlib import cm
 from matplotlib.ticker import LinearLocator, FormatStrFormatter
 import numpy as np
-from utils.utils import *
+from ..utils.utils import *
 from math import ceil
 from scipy.interpolate import griddata
+from sklearn.metrics import confusion_matrix
+import seaborn as sns
+
 
 def plot_surf(x,y,z,title):
     '''
@@ -160,3 +163,21 @@ def plot_train_test_mse_r2(mse_train, mse_test, r2_train,r2_test,params,param_la
     R2_labels = (param_label,'R2 score')
     plots = [(MSE_dict,MSE_labels),(R2_dict,R2_labels)]
     return plot_plots(plots,params)
+
+def plot_confusion_matrix(z,p,title):
+    conf_mat = confusion_matrix(z,p)
+    fig, ax = plt.subplots(figsize = (10, 10))
+    ax = sns.heatmap(conf_mat, annot=True, ax=ax, cmap="viridis")
+    ax.set_title(title)
+    plt.show()    
+
+def plot_grid_search(data,scores,title='Mean test score'):
+    '''
+    Plots mean test score on a heat map as a
+    function of 'scores'.
+    '''
+    df_p = data.pivot(scores[0],scores[1],"mean_test_score")
+    fig, ax = plt.subplots(figsize = (10, 10))
+    ax = sns.heatmap(df_p, annot=True, ax=ax, cmap="viridis")
+    ax.set_title(title)
+    plt.show()

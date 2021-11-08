@@ -1,9 +1,9 @@
 
 from numpy import mean, zeros, linalg, eye
 
-from processing.data_preprocessing import center_data
-from model_evaluation.metrics import MSE, R2
-from modelling.common import predict
+from ..processing.data_preprocessing import center_data
+from ..model_evaluation.metrics import MSE, R2
+
 from ._sgdBase import SGD_optimizer
 
 
@@ -64,21 +64,25 @@ class LinReg:
     
         
 class SGD_linreg(SGD_optimizer):
+      
 
     def __init__(self,
                  fit_intercept = False,
+                 loss_func = 'squared_loss',
                  regularization = 'l2',
                  lmb = 0.001,
                  momentum = 0.5,
                  schedule = 'constant',
                  lr0 = 0.01,
                  batch_size=32,
-                 n_epochs=10,
+                 n_epochs=100,
                  t0 = 50,t1 = 300, 
-                 power_t = 0.05
+                 power_t = 0.05,
+                 val_fraction = 0.1
                  ):
         
-        super().__init__(regularization = regularization,
+        super().__init__(loss_func=loss_func,
+                         regularization = regularization,
                          lmb = lmb,
                          momentum = momentum,
                          schedule = schedule,
@@ -87,6 +91,7 @@ class SGD_linreg(SGD_optimizer):
                          n_epochs = n_epochs,
                          t0 = t0, t1 = t1, 
                          power_t = power_t,
+                         val_fraction=val_fraction
                          )
 
       
@@ -130,22 +135,33 @@ class SGD_linreg(SGD_optimizer):
         '''
         return X @ self.beta + self.intercept
       
+    def predict_continuous(self,X):
+        '''
+        Outputs the prediction with continuous
+        values. In this case(linear regression)
+        it's exactly the same as predict. It's
+        defined for generability in loss functions
+        with other models.
+        '''
+        return self.predict(X)
+      
     def partial_fit(self,X,z):
         '''
         Performs a single SGD step for linear model
         and updates beta and intercept accordingly.
         '''
-        update = self.predict(X) - z
-
+        p = self.predict(X)
+        update = p - z
         if (self.fit_intercept):
             self.intercept -= self.lr*mean(update)
 
         if (self.momentum):    
             self.v = self.momentum*self.v - self.lr*self.cost_grad(X,update)
-            self.beta += self.v
-            
+            self.beta += self.v          
         else:
             self.beta -= self.lr*self.cost_grad(X,update)
+            
+        return self.loss_func(z,p)
 
     def cost_grad(self, X, update):
         '''

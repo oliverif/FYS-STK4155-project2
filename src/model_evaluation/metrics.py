@@ -20,7 +20,15 @@ def accuracy(target, prediction):
     Returns the accuracy score of prediction compared
     to target.
     '''
+    #prediction = prediction.ravel()
+    #target = target.ravel()
+    #print(sum(prediction==target))
+    #print(target.shape)
     return sum(prediction==target)/len(target)
+
+METRIC_FUNC = {'r2':R2,
+          'mse':MSE,
+          'accuracy':accuracy}
 
 def scores(target,prediction):
     '''
