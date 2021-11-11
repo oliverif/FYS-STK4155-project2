@@ -79,9 +79,16 @@ class NeuralNetwork(SGD_optimizer):
     def initialize(self,input_shape):
         '''
         Initializes layers given input shape. Used
-        when fit is called.
+        when fit is called. 
+        
+        A layer's weight matrix has the shape of 
+        (prev_n_neurons,current_n_neurons). I.e the 
+        previous layer's weight matrix must be defined
+        before the current can.
+        The first hidden layer will have shape
+        (n_features, current_layer_neurons).
         '''
-        self.lr = self.lr0
+        
         self.n_samples,self.n_features = input_shape
         prev_shape = (self.hidden_layer_sizes[0],input_shape[1])
         for layer,neurons in enumerate(self.hidden_layer_sizes):
@@ -100,13 +107,20 @@ class NeuralNetwork(SGD_optimizer):
         Performs a single SGD step for neural network
         and updates weights and biases accordingly.
         '''
+        #Feed foward, i.e predict
         p = self._feed_forward(X)
+        #Backpropagation
         self._backpropagation(X,z)
+        #Capture loss
         loss = self.loss_func(z,p)
+        #Add regularization
         if(self.regularization == 'l2'):
             for layer in self.layers:
-                w = layer.weights.ravel()
-                loss += self.lmb * w @ w / (2*X.shape[0])             
+                w = layer.weights.ravel()  
+                # Dividing by n_samples in current batch makes 
+                # regularization comparable across several batch 
+                # sizes. 
+                loss += self.lmb * w @ w / (2*X.shape[0])            
         return loss
     
     def score(self,X,z):
@@ -115,12 +129,15 @@ class NeuralNetwork(SGD_optimizer):
         NN is regressor.
         Returns the mean accuracy of the prediction if NN is classifier.
         '''
+        #Predict output
         p = self.predict(X)
+        #Ensure correct shape
         if(len(z.shape)==1):
-            z = z.reshape(-1,1)        
+            z = z.reshape(-1,1)
+        #MLP is regressor        
         if (self.output_activation == 'identity'):
             return R2(z,p)
-        
+        #MLP is classifier 
         return accuracy(z,p)
     
     def predict(self,X):
@@ -130,8 +147,12 @@ class NeuralNetwork(SGD_optimizer):
         Predicts output based on X.
         '''
         p = self._fast_feed_forward(X)
-        if(self.output_activation=='linear'):
+        #Continous if regressor
+        if(self.output_activation=='identity'):
             return p
+        #Binary if classifier. Threshold is
+        #set to 0.5 in this case. I.e
+        #above 50% probablity = 1.
         return np.where(p<0.5,0,1)
     
     def predict_continuous(self,X):
@@ -142,15 +163,26 @@ class NeuralNetwork(SGD_optimizer):
         return self._fast_feed_forward(X)
                      
     def _init_w(self,n_features,n_neurons):
+        '''
+        Initializes the weights of the neural network.
+        '''
+        #Normally distribute weight values
         if (self.w_init=='normal'):
             return random.randn(n_features, n_neurons)
+        #Uniformly distribute weight values
         elif(self.w_init=='uniform'):
             return random.uniform(0,1,(n_features, n_neurons))
+        #Uniformly distribute weight values 
+        #with min max according to Glorot et al.
         elif(self.w_init =='glorot'):
             limit = np.sqrt(6.0/(n_features+n_neurons))
             return random.uniform(-limit,limit,(n_features, n_neurons))
     
     def _init_b(self,lenght):
+        '''
+        Initializes the biases to some constant
+        defined by self.b_init given in __init__.
+        ''' 
         return full(lenght,self.b_init)
     
     def _feed_forward(self,X):
@@ -158,6 +190,7 @@ class NeuralNetwork(SGD_optimizer):
         Feeds X forward in the network and 
         stores each activations in the layers
         '''
+        #Initial "activation", i.e input nodes
         a = X
         for layer in self.layers:
             #Weighted sumjh
@@ -191,23 +224,32 @@ class NeuralNetwork(SGD_optimizer):
         This function updates
         ''' 
         #Do last layer first
+        #Last layer error
         error = self.layers[-1].activations - z
-        weights = self.layers[-1].weights #Store weights for next layer
+        #Store weights for next layer
+        weights = self.layers[-1].weights 
+        #Calculate the gradients
         w_grad, b_grad = self._calc_grads(weights,self.layers[-2].activations, error)
+        #Update layer accordingly
         self._update_weights_and_biases(self.layers[-1],w_grad,b_grad)
         
         #Do hidden layers
         for i in range(len(self.layers)-2,0,-1):
             #Next layer error
-            error = (error @ weights.T)*self.layers[i].derivative(self.layers[i].z_h,error)     
-            weights = self.layers[i].weights #Store weights for next iteration
+            error = (error @ weights.T)*self.layers[i].derivative(self.layers[i].z_h,error) 
+            #Store weights for next layer    
+            weights = self.layers[i].weights
+            #Calculate the gradients
             w_grad, b_grad = self._calc_grads(weights,self.layers[i-1].activations, error) 
-            #Back propagate one step
+            #Update layer accordingly
             self._update_weights_and_biases(self.layers[i],w_grad,b_grad)
                  
         #Do first layer
+        #First layer error
         error = matmul(error, weights.T)*self.layers[0].derivative(self.layers[0].z_h,error)
+        #Calculate the gradients
         w_grad, b_grad = self._calc_grads(self.layers[0].weights, X, error)
+        #Update layer accordingly
         self._update_weights_and_biases(self.layers[0],w_grad,b_grad)
        
     def _update_weights_and_biases(self,layer,w_grad,b_grad):
@@ -216,14 +258,18 @@ class NeuralNetwork(SGD_optimizer):
         Either updates with momentum or simply
         subtracts w_grad and b_grad from
         weights and biases respectively.
-        '''  
-        if (self.momentum):    
+        '''
+        
+        if (self.momentum): 
+            #Calculate and store velocities for weights and bias gradients   
             layer.v_w = self.momentum*layer.v_w - self.lr*w_grad
             layer.v_b = self.momentum*layer.v_b - self.lr*b_grad
+            #Update weights and biases with velocity
             layer.weights += layer.v_w
             layer.bias += layer.v_b
             
         else:
+            #Update weights and biases with gradients
             layer.weights -=  self.lr*w_grad
             layer.bias -=  self.lr*b_grad
              
@@ -232,12 +278,16 @@ class NeuralNetwork(SGD_optimizer):
         Calculates the gradients for current_layer's
         weights and biases.
         '''
+        #Weight gradient is a function of previous
+        #layer activation and current layer error.
         w_grad = matmul(prev_layer_a.T,error)
+        #Bias gradient
         b_grad = np.mean(error,axis=0)
         #Add l2 regularization if specified
         if(self.regularization=='l2'):
             w_grad += self.lmb * current_layer_w
-        
+        #Dividing by batch size allows for more comparable results with
+        #different batch sizes.
         w_grad /=self.batch_size       
         return w_grad,b_grad
 

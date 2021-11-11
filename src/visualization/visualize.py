@@ -117,7 +117,6 @@ def plot_plots(plots,params):
     n_plots = len(plots)
     n_rows = ceil(n_plots/2)
     n_cols = min(2,len(plots))
-    print(n_cols)
     fig, axs = plt.subplots(n_rows,n_cols,figsize=(min(15,n_cols*7.5),5*n_rows))
 
     if (isinstance(axs,np.ndarray)):
@@ -136,7 +135,7 @@ def plot_plots(plots,params):
 
     return fig
 
-def plot_curves(curves,params , ax):
+def plot_curves(curves,params,xy_labels=None,x_axis='linear',title = None,ax=None):
     '''
     Plots all curves in curves in one plot
     
@@ -146,13 +145,23 @@ def plot_curves(curves,params , ax):
         Dictionary containing the curves to be plotted
         keyed on their labels
     
-    ax: Axes object
-        ax used to plot
+    params: list or ndarray
+        The corresponding parameter values of the curve
     '''
-
-    for (label, vals) in curves.items():
-        ax.semilogx(params,vals,label=label)
+    #ax = plt.subplot()
+    if(x_axis =='linear'):
+        for (label, vals) in curves.items():
+            ax.plot(params,vals,label=label)
+    
+    elif(x_axis == 'semilog'):    
+        for (label, vals) in curves.items():
+            ax.semilogx(params,vals,label=label,ax=ax)
     ax.legend()
+    if(xy_labels is not None):
+        ax.set_xlabel(xy_labels[0])
+        ax.set_ylabel(xy_labels[1])
+    if(title is not None):
+        ax.set_title(title)
     return ax
 
 def plot_train_test_mse_r2(mse_train, mse_test, r2_train,r2_test,params,param_label):

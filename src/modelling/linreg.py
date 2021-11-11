@@ -8,7 +8,7 @@ from ._sgdBase import SGD_optimizer
 
 
 class LinReg:
-    def __init__(self,fit_intercept = True,
+    def __init__(self,fit_intercept = False,
                  regularization = 'l2',
                  lmb = 0.001):
         self.regularization = regularization
@@ -43,6 +43,10 @@ class LinReg:
         return X @ self.beta + self.intercept 
     
     def score(self,X,z):
+        '''
+        Calculates the R2 score of the
+        model.
+        '''
         p = self.predict(X,z)
         return R2(z,p)      
         
@@ -98,7 +102,7 @@ class SGD_linreg(SGD_optimizer):
         #Additional parameters for this SGD linear regression
         self.v = 0
         self.fit_intercept = fit_intercept
-        self.param_setters['fit_intercept']= self.set_fit_intercept,
+        self.params += ['fit_intercept']
 
         
     def initialize(self, shape):

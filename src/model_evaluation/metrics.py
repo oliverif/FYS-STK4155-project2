@@ -15,6 +15,12 @@ def MSE(target, prediction):
     n = size(prediction)
     return sum((target-prediction)**2)/n
 
+def MSE_R2(target, prediction):
+    '''
+    Returns MSE and R2
+    '''
+    return MSE(target,prediction),R2(target,prediction)
+
 def accuracy(target, prediction):
     '''
     Returns the accuracy score of prediction compared

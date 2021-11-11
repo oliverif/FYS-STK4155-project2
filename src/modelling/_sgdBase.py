@@ -1,7 +1,9 @@
-from numpy import random, mean
+from numpy import random, arange
 from sklearn.utils import shuffle
 from sklearn.model_selection import train_test_split
 from abc import abstractmethod
+
+from src.visualization.visualize import plot_curves
 from ._functions import LOSS_FUNCS
 
 
@@ -73,6 +75,12 @@ class SGD_optimizer(object):
         if (self.val_fraction>0):
             X, X_val, z, z_val = train_test_split(X,z,test_size=self.val_fraction)
 
+        #Reset the learning rate, score and loss in case of refit
+        self.lr = self.lr0
+        self.loss = []
+        self.scores = []
+        self.val_loss = []
+        self.val_scores = []
         
         #Initialize parameters
         self.initialize(X.shape)
@@ -195,6 +203,27 @@ class SGD_optimizer(object):
         xi = X[randi*self.batch_size : randi*self.batch_size+self.batch_size]
         zi = z[randi*self.batch_size : randi*self.batch_size+self.batch_size]
         return xi, zi
+
+    def plot_loss(self,title=None,ax=None):
+        params = arange(1,self.n_epochs+1)
+        ax = plot_curves({'Train loss':self.loss,
+                          'Validation loss':self.val_loss},
+                         params,
+                         ('epoch','loss'),
+                         title=title,
+                         ax=ax)
+        return ax
+    
+    def plot_score(self,title=None,ax=None):
+        params = arange(1,self.n_epochs+1)
+        ax = plot_curves({'Train score':self.scores,
+                          'Validation score':self.val_scores},
+                         params,
+                         ('epoch','score'),
+                         title=title,
+                         ax=ax)
+        return ax
+        
 
     @abstractmethod
     def score(self,X,z):
