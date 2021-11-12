@@ -87,9 +87,9 @@ class SGD_optimizer(object):
 
         #The number of batches is calculated from batch size.
         n_batches = int(z.shape[0]/self.batch_size)
-
+    
         for epoch in range(self.n_epochs):
-            running_loss = 0
+            running_loss = 0          
             for batch in range(n_batches):
                 #Select a random batch
                 xi,zi = self.select_batch(X,z)
@@ -107,6 +107,7 @@ class SGD_optimizer(object):
                 self.val_scores.append(self.score(X_val,z_val))
             #Shuffle training data for next round
             X,z = shuffle(X,z)
+
         return self
 
     #what
@@ -206,22 +207,36 @@ class SGD_optimizer(object):
 
     def plot_loss(self,title=None,ax=None):
         params = arange(1,self.n_epochs+1)
-        ax = plot_curves({'Train loss':self.loss,
-                          'Validation loss':self.val_loss},
-                         params,
-                         ('epoch','loss'),
-                         title=title,
-                         ax=ax)
+        if(self.val_fraction>0):
+            ax = plot_curves({'Train loss':self.loss,
+                            'Validation loss':self.val_loss},
+                            params,
+                            ('epoch','loss'),
+                            title=title,
+                            ax=ax)
+        else:
+            ax = plot_curves({'Train loss':self.loss},
+                            params,
+                            ('epoch','loss'),
+                            title=title,
+                            ax=ax)
         return ax
     
     def plot_score(self,title=None,ax=None):
         params = arange(1,self.n_epochs+1)
-        ax = plot_curves({'Train score':self.scores,
-                          'Validation score':self.val_scores},
-                         params,
-                         ('epoch','score'),
-                         title=title,
-                         ax=ax)
+        if(self.val_fraction>0):
+            ax = plot_curves({'Train score':self.scores,
+                            'Validation score':self.val_scores},
+                            params,
+                            ('epoch','score'),
+                            title=title,
+                            ax=ax)
+        else:
+            ax = plot_curves({'Train score':self.scores},
+                            params,
+                            ('epoch','score'),
+                            title=title,
+                            ax=ax)            
         return ax
         
 

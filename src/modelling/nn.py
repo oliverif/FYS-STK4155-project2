@@ -109,10 +109,11 @@ class NeuralNetwork(SGD_optimizer):
         '''
         #Feed foward, i.e predict
         p = self._feed_forward(X)
-        #Backpropagation
-        self._backpropagation(X,z)
         #Capture loss
         loss = self.loss_func(z,p)
+        #Backpropagation
+        self._backpropagation(X,z)
+        
         #Add regularization
         if(self.regularization == 'l2'):
             for layer in self.layers:

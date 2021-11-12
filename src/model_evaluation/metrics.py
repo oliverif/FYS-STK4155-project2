@@ -32,8 +32,8 @@ def accuracy(target, prediction):
     #print(target.shape)
     return sum(prediction==target)/len(target)
 
-METRIC_FUNC = {'r2':R2,
-          'mse':MSE,
+METRIC_FUNC = {'R2':R2,
+          'MSE':MSE,
           'accuracy':accuracy}
 
 def scores(target,prediction):

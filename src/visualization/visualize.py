@@ -148,6 +148,8 @@ def plot_curves(curves,params,xy_labels=None,x_axis='linear',title = None,ax=Non
     params: list or ndarray
         The corresponding parameter values of the curve
     '''
+    if (ax is None):
+        ax = plt.subplot()
     #ax = plt.subplot()
     if(x_axis =='linear'):
         for (label, vals) in curves.items():

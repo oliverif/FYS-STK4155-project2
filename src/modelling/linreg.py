@@ -80,7 +80,7 @@ class SGD_linreg(SGD_optimizer):
                  lr0 = 0.01,
                  batch_size=32,
                  n_epochs=100,
-                 t0 = 50,t1 = 300, 
+                 t0 = 2,t1 = 10, 
                  power_t = 0.05,
                  val_fraction = 0.1
                  ):
