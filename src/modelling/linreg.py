@@ -176,12 +176,4 @@ class SGD_linreg(SGD_optimizer):
             grad += (2/X.shape[0])*self.lmb*self.beta
 
         return grad
-
-    def fit_score(self,X_train, z_train, X_test, z_test):
-
-        self.fit(X_train,z_train)
-        self.score(X_train,z_train)
-        z_pred = predict(X_test,self.beta)
-
-        return self.mse, MSE(z_test,z_pred), self.r2, R2(z_test,z_pred)
     

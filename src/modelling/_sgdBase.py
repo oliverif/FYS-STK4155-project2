@@ -110,7 +110,6 @@ class SGD_optimizer(object):
 
         return self
 
-    #what
     def set_params(self,**new_params):
         '''
         Sets one or more parameters
@@ -182,7 +181,7 @@ class SGD_optimizer(object):
 
     def decaying_schedule(self,t):
         '''
-        Decaing schedule for learning rate.
+        Decaying schedule for learning rate.
         '''
         self.lr = self.t0/(t+self.t1)
 
