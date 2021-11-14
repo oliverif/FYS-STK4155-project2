@@ -39,11 +39,27 @@ class SGD_logreg(SGD_linreg,SGD_optimizer):
         #Additional parameters for this SGD linear regression
         self.v = 0
         self.fit_intercept = fit_intercept
-        self.param_setters['fit_intercept']= self.set_fit_intercept,
 
     def predict(self,X):
-        '''
-        Predicts output based on X
+        '''  
+        Returns prediction based on X.
+        
+        This function classifies the predictions
+        as well. It first uses LinReg's
+        predict to predict continuous values,
+        then runs them through the sigmoid function.
+        
+        Finally it calssifies the probabilities, based on
+        p>0.5 = 1, and p<0.5 = 0.
+        
+        Inputs:
+        -------
+        X: ndarray(n_samples,n_features)
+            Design matrix
+        
+        Outpus:
+        -------
+        pred: ndarray of shape (n_samples,1)
         '''
         #Use predict from linear regression first
         pred = super().predict(X)
@@ -55,6 +71,18 @@ class SGD_logreg(SGD_linreg,SGD_optimizer):
         '''
         Outputs the prediction with continuous
         values. AKA predicts probabilities.
+        
+        This function is similar as predict,
+        however does not classify at the end.
+        
+        Inputs:
+        -------
+        X: ndarray(n_samples,n_features)
+            Design matrix
+        
+        Outpus:
+        -------
+        pred: ndarray of shape (n_samples,1)
         '''
         #Use predict from linear regression first
         pred = super().predict(X)
@@ -66,11 +94,44 @@ class SGD_logreg(SGD_linreg,SGD_optimizer):
         Gradient of log loss cost funtion.
         It's almost equal to the gradient of squared
         loss cost however without the factor 2.
+        
+        This function simply calls LinReg's
+        cost_grad and divides it by two.
+        
+        Inputs:
+        -------
+        X: ndarray(n_samples,n_features)
+            Design matrix
+            
+        update: ndarray of shape(n_samples,1)
+            Update value calculated in partial fit
+        
+        Output:
+        -------
+        grad: ndarray of shape(n_samples,1)
+            Gradient of the beta values.
         '''
+
         return super().cost_grad(X,update) / 2
     
     def score(self,X,z):
+        '''
+        Returns the mean accuracy of the prediction.
+        
+        This function predicts based on X and compares its prediction with
+        z.
+        
+        Inputs:
+        -------
+        X: ndarray(n_samples,n_features)
+            Design matrix
+        
+        z: ndarray(n_samples,1)
+            Target data  
+        '''
+        #Predict
         p = self.predict(X)
+        #Ensure correct shape
         if(len(z.shape)==1):
             z = z.reshape(-1,1)
         return accuracy(z,p)

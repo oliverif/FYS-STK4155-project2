@@ -26,6 +26,82 @@ class Layer:
 
 
 class NeuralNetwork(SGD_optimizer):
+    '''
+    Neural Network with SGD optimizer.
+    
+    This model minimizes either the squared error
+    loss function or the binary cross entropy loss function
+    to obtain optimal weights and biases.
+    
+    The class inherits from SGD_optimizer as it is the
+    base class of all models.
+    
+    Parameters:
+    ----------
+    hidden_layer_sizes: tuple, default=(50,)
+        Defines the architecture of the network. Each entry in the tuple
+        is a layer. The number is the amount of neurons for that layer.
+        E.g. (50,100) has two hidden layers, first with 50 neurons,
+        and second with 100.
+        
+    hidden_activation: str{'sigmoid','relu','leakyrelu'}, default='relu'
+        The activation function to use in the hidden layers.
+        
+    output_activation: str{'sigmoid','identity'}
+        The activation function to use for the output. Sigmoid is used
+        for classification problems while identity is used for regression problems.
+        
+    n_categories: int, default=1
+        The number of output categories. Only useful for multiclass. Must be 1
+        when nn is regressor.
+        
+    w_init: str{'normal','uniform','glorot'},default='glorot
+        The initialization scheme to use when initializing the weights of the
+        layers.
+        
+    b_init: float, default=0.001
+        The initialization value to give all biases. All biases are initialized
+        to constant values in this model.
+        
+    loss_func: str{'cross_entropy','squared_loss'} default='cross_entropy'
+        The loss function to use. Cross entropy is often used in classification
+        problems while squared loss is used in regression.
+               
+    regularization: str{'l2',None} default='l2'
+        Wether or not to use l2 regularization
+        
+    lmb: float, default = 0.001
+        The regularization parameter. Only used if regularization is 'l2'
+        
+    momentum: float, default = 0.5
+        The portion of the former velocity to influde in new velocity calculation.
+        
+    schedule: str{'constant','invscaling','decaying'}, default='constant'
+        The learning rate schedule.
+        
+    lr0: float, default=0.01
+        The inital learning rate. Only used by constant and invscaling.
+        
+    batch_size: int, default=32
+        The amount of data points in each batch during mini batch stochastic
+        gradient descent. Should be a multiplum of 2.
+        
+    n_epochs: int, default=100
+        Number of epochs to train.
+        
+    t0: int, default=50
+        parameter in the decaying schedule
+    
+    t1: int, default=300
+        parameter in the decaying schedule
+        
+    power_t: float, default=0.05
+        parameter in the invscaling schedule
+        
+    val_fraction: float, default=0.1
+        The portion of the input data to set aside as validation data.
+        Validation data is used to study loss and score during training.
+    '''
     def __init__(
             self,
             hidden_layer_sizes = (50,),
@@ -87,6 +163,12 @@ class NeuralNetwork(SGD_optimizer):
         before the current can.
         The first hidden layer will have shape
         (n_features, current_layer_neurons).
+        
+        Inputs:
+        -------
+        input_shape: tuple
+            The shape of the input data so that
+            all subsequent layers can be initialized.
         '''
         
         self.n_samples,self.n_features = input_shape
@@ -106,6 +188,28 @@ class NeuralNetwork(SGD_optimizer):
         '''
         Performs a single SGD step for neural network
         and updates weights and biases accordingly.
+        
+        This function first performs feed forward
+        to generate the activations. The loss is then
+        capturen, and then backpropagation is performed
+        updating the weights.
+        
+        If regularization is employed, this is added
+        to the loss as well.
+        
+        Inputs:
+        -------
+        X: ndarray(n_samples,n_features)
+            Design matrix
+        
+        z: ndarray(n_samples,1)
+            Target data
+            
+        Output:
+        -------
+        loss: float
+            The loss captured right before parameter
+            update.
         '''
         #Feed foward, i.e predict
         p = self._feed_forward(X)
@@ -121,7 +225,7 @@ class NeuralNetwork(SGD_optimizer):
                 # Dividing by n_samples in current batch makes 
                 # regularization comparable across several batch 
                 # sizes. 
-                loss += self.lmb * w @ w / (2*X.shape[0])            
+                loss += self.lmb * (w @ w) / (2*z.shape[0])            
         return loss
     
     def score(self,X,z):
@@ -129,6 +233,17 @@ class NeuralNetwork(SGD_optimizer):
         Returns the coefficient of determination(R2) for the prediction if
         NN is regressor.
         Returns the mean accuracy of the prediction if NN is classifier.
+        
+        This function predicts based on X and compares its prediction with
+        z.
+        
+        Inputs:
+        -------
+        X: ndarray(n_samples,n_features)
+            Design matrix
+        
+        z: ndarray(n_samples,1)
+            Target data  
         '''
         #Predict output
         p = self.predict(X)
@@ -146,6 +261,11 @@ class NeuralNetwork(SGD_optimizer):
         Feeds input forward to produce
         output of network.
         Predicts output based on X.
+        
+        Inputs:
+        -------
+        X: ndarray(n_samples,n_features)
+            Design matrix
         '''
         p = self._fast_feed_forward(X)
         #Continous if regressor
@@ -160,19 +280,38 @@ class NeuralNetwork(SGD_optimizer):
         '''
         Outputs the prediction with continuous
         values. AKA predicts probabilities.
+        
+        Inputs:
+        -------
+        X: ndarray(n_samples,n_features)
+            Design matrix
         '''
         return self._fast_feed_forward(X)
                      
     def _init_w(self,n_features,n_neurons):
         '''
-        Initializes the weights of the neural network.
+        Returns a numpy array with distributed
+        values according to self.w_init.
+        
+        This function is used to initialize the 
+        weights of the neural network.
+        
+        Inputs:
+        -------
+        n_features: int
+            number of features or input
+            nodes to the layer
+            
+        n_neurons: int
+            Amount of neurons for the current
+            layer.
         '''
         #Normally distribute weight values
         if (self.w_init=='normal'):
             return random.randn(n_features, n_neurons)
         #Uniformly distribute weight values
         elif(self.w_init=='uniform'):
-            return random.uniform(0,1,(n_features, n_neurons))
+            return random.uniform(-1,1,(n_features, n_neurons))
         #Uniformly distribute weight values 
         #with min max according to Glorot et al.
         elif(self.w_init =='glorot'):
@@ -181,15 +320,47 @@ class NeuralNetwork(SGD_optimizer):
     
     def _init_b(self,lenght):
         '''
-        Initializes the biases to some constant
-        defined by self.b_init given in __init__.
+        Returns a numpy array containing the
+        same values.
+        
+        This function is used to initialize the 
+        biases to some constant defined by self.b_init 
+        given in __init__.
+        
+        Inputs:
+        -------
+        length: int
+            The length of the bias array, i.e amount of nodes
+            in layer.
+            
+        Outpus:
+        -------
+        ndarray(length,)
+            Array containing self.b_init value
         ''' 
         return full(lenght,self.b_init)
     
     def _feed_forward(self,X):
         '''
         Feeds X forward in the network and 
-        stores each activations in the layers
+        stores each of the activations in the layers
+        
+        This function mainly consist of a loop
+        iterating the layers from first to last.
+        Here it calculates the weightet sum of
+        all incoming activations and adds the bias.
+        These values are then activated through
+        the activation function. Lastly a is set
+        to this activation so that the next layer can
+        use it.
+        
+        Note that for the very first layer, the
+        activations is simply X.
+        
+        Inputs:
+        -------
+        X: ndarray(n_samples,n_features)
+            Design matrix
         '''
         #Initial "activation", i.e input nodes
         a = X
@@ -222,7 +393,34 @@ class NeuralNetwork(SGD_optimizer):
         '''
         Performs backpropagation across the entire
         network.
-        This function updates
+        
+        This function calculates error and gradients for
+        each layer staring at the outputlayer and working
+        it's way backwards. As it loops backwards it also
+        updates the parameters.
+        
+        Note that error and gradient are both calculated
+        before moving to next layer. A common method
+        is to first calculate error for all layers,
+        and then calculate gradients for all, however for
+        simplicity in the for loop error and gradients
+        are calculated pairwise instead.
+        
+        The first step is to update the last layer as the error
+        is calculated slightly differently here.
+        After this the function enters a loop iterating all the
+        hidden layers as they have the same methods for
+        calculating error and gradient, and updating parameters.
+        After the loop the first layer is updated as it
+        uses X to calculate it's gradient.
+        
+        Inputs:
+        -------
+        X: ndarray(n_samples,n_features)
+            Design matrix
+        
+        z: ndarray(n_samples,1)
+            Target data  
         ''' 
         #Do last layer first
         #Last layer error

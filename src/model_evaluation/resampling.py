@@ -1,8 +1,28 @@
-from sklearn.model_selection import KFold
-from numpy import mean
+from sklearn.model_selection import KFold,train_test_split
+from sklearn.utils import resample
+from numpy import mean, empty, var
 from .metrics import METRIC_FUNC
 
-def cross_validate(model, X, z, k_folds, X_scaler=None, z_scaler = None, metrics = None):
+def bootstrap(model, X_train, X_test, z_train,n_bootstraps=200):
+
+    z_pred = empty((X_test.shape[0], n_bootstraps))   
+    for i in range(n_bootstraps):
+        X_,z_ = resample(X_train, z_train)         #random resampling 
+        model.fit(X_,z_)                #fit beta to new resampled data
+        z_pred[:,i] = model.predict(X_test).ravel() #predict test data
+
+    return z_pred
+
+def bias_var(model, X_train,X_test, z_train,z_test, n_bootstraps=200):
+    
+    z_pred = bootstrap(model,X_train, z_train, X_test,n_bootstraps)
+    error = mean( mean((z_test - z_pred)**2, axis=1, keepdims=True) )
+    bias = mean( (z_test - mean(z_pred, axis=1, keepdims=True))**2 )
+    variance = mean( var(z_pred, axis=1, keepdims=True) )
+    
+    return error, bias, variance
+
+def cross_validate(model, X, z, k_folds=5, X_scaler=None, z_scaler = None, metrics = None):
     '''
     Calculates the cross validated score of model.
     The scoring metric  is given by the model itself.

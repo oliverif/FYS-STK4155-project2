@@ -56,15 +56,48 @@ def grid_search_df(X, z, model, param_grid):
     '''
     Performs a grid search for best model
     performance across param_grid. 
-    Funcion wraps sklearn GridSearchCV and
+    Function wraps sklearn GridSearchCV and
     outputs more readable results. SKlearn implements
     multiprocessing and enables much faster execution.
+    
+
+    Inputs:
+    -------
+    X: ndarray(n_samples,n_features)
+        Design matrix
+        
+    z: ndarray(n_samples,1)
+        Target data
+    
+    model: model object
+        The model to perform the gridsearch for.
+        
+    param_grid: dict(param_name=list_of_values)
+        Dictionary containing parameter names and the
+        values to test for. Note that param_name
+        must match exactly the parameter name of the
+        model. This dictionary is passed further to
+        GridSearchCV
+        
+    Outputs:
+    -------
+    gs: GridSearch object
+        A model fitted on the best parameters found
+        in gridsearch.
+    
+    df: pandas.DataFrame
+        Dataframe containing the results of the gridsearch.
     '''
+    #Gridsearch object
     gs = GridSearchCV(estimator = model, 
                       param_grid = param_grid,
                       n_jobs=-1)
+    #Fit the model
     gs = gs.fit(X,z)
+    #Create list of parameters as presented in the GridSearchCV
+    #output
     param_strs =['param_'+s for s in list(param_grid.keys())]
+    #Extract only the useful columns
     data = {k[6:]: gs.cv_results_[k] for k in (param_strs)}
     data['mean_test_score'] = gs.cv_results_['mean_test_score']
     data['rank_test_score'] = gs.cv_results_['rank_test_score']

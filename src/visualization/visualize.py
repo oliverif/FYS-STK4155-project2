@@ -7,6 +7,7 @@ from ..utils.utils import *
 from math import ceil
 from scipy.interpolate import griddata
 from sklearn.metrics import confusion_matrix
+from matplotlib.ticker import FormatStrFormatter
 import seaborn as sns
 
 
@@ -157,7 +158,7 @@ def plot_curves(curves,params,xy_labels=None,x_axis='linear',title = None,ax=Non
     
     elif(x_axis == 'semilog'):    
         for (label, vals) in curves.items():
-            ax.semilogx(params,vals,label=label,ax=ax)
+            ax.semilogx(params,vals,label=label)
     ax.legend()
     if(xy_labels is not None):
         ax.set_xlabel(xy_labels[0])
@@ -175,12 +176,22 @@ def plot_train_test_mse_r2(mse_train, mse_test, r2_train,r2_test,params,param_la
     plots = [(MSE_dict,MSE_labels),(R2_dict,R2_labels)]
     return plot_plots(plots,params)
 
-def plot_confusion_matrix(z,p,title):
+def plot_confusion_matrix(z,p,ax=None,title=None,labels=['Malignant','Benign']):
     conf_mat = confusion_matrix(z,p)
-    fig, ax = plt.subplots(figsize = (10, 10))
-    ax = sns.heatmap(conf_mat, annot=True, ax=ax, cmap="viridis")
-    ax.set_title(title)
-    plt.show()    
+    if (ax is None):
+        ax = plt.gca()   
+    ax = sns.heatmap(conf_mat, 
+                     annot=True, 
+                     ax=ax,xticklabels=labels, 
+                     yticklabels=labels ,
+                     fmt = 'd', 
+                     cmap="viridis")
+    sns.set(font_scale=1.3)
+    ax.set_xlabel("Predicted")
+    ax.set_ylabel("Truth")
+    if(title is not None):
+        ax.set_title(title)
+    return ax    
 
 def plot_grid_search(data,scores,title='Mean test score'):
     '''

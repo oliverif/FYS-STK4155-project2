@@ -12,8 +12,8 @@ def MSE(target, prediction):
     Returns the MSE of prediction compared 
     to target.
     '''
-    n = size(prediction)
-    return sum((target-prediction)**2)/n
+    
+    return ((target-prediction)**2).mean()
 
 def MSE_R2(target, prediction):
     '''
@@ -26,10 +26,6 @@ def accuracy(target, prediction):
     Returns the accuracy score of prediction compared
     to target.
     '''
-    #prediction = prediction.ravel()
-    #target = target.ravel()
-    #print(sum(prediction==target))
-    #print(target.shape)
     return sum(prediction==target)/len(target)
 
 METRIC_FUNC = {'R2':R2,
