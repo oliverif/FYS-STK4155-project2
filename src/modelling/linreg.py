@@ -18,6 +18,7 @@ class LinReg:
         self.intercept = 0
         self.mse = 0
         self.r2 = 0
+        self.params=['lmb','fit_intercept']
              
     def fit(self,X, z):
         '''
@@ -126,6 +127,40 @@ class LinReg:
         '''
         I =  eye(X.shape[1],X.shape[1]) #Identity matrix
         self.beta = linalg.pinv(X.T @ X + self.lmb*I) @ X.T @ z
+        
+    def set_params(self,**new_params):
+        '''
+        Sets one or more parameters
+        contained in dictionarey params.
+        Uses pythons setattr to set attribute.
+        
+        Input:
+        ------
+        new_params: dict(paramname:value)
+        
+        Output:
+        ------
+        self: _sgdBase object
+            Outputs self for compatability. Also
+            allows chained functions.
+        '''
+        for key, val in new_params.items():
+            setattr(self,key,val)
+        return self
+    
+    def get_params(self, deep=True):
+        '''
+        Gets parameters using pythons getattr
+        function. Only return those also included
+        in the parameter list self.params.
+        
+        Input:
+        ------
+        deep(not in use): bool
+            This is not in used, but added
+            for compatability with sklearn methods.
+        '''
+        return {param:getattr(self,param) for param in self.params}
         
     
         

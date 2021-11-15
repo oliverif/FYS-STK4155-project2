@@ -1,5 +1,7 @@
 from imageio import imread
+import math
 from numpy import meshgrid, linspace,ravel, ones,column_stack, asarray
+
 
 
 
@@ -60,14 +62,14 @@ def create_poly_design_matrix(x,y=None, degree=2):
 
    
     
-def create_dataset(fileName,N=100,degree=None):
+def create_dataset(fileName,N=100,degree=None, downsampling=1):
     '''
     Creates design matrix or x,y(depeding on degree) and target data
     Inputs: filename(string), dimension, degree(optional)
     Outputs: Outputs z, and either design matrix X or x and y stacked in columns.
     '''
-    z = load_data(fileName,N,N).reshape(-1,1)
-    x,y = create_normalized_meshgrid(N,N)
+    z = load_data(fileName,N,N)[::downsampling,::downsampling].reshape(-1,1)
+    x,y = create_normalized_meshgrid(math.ceil(N/downsampling),math.ceil(N/downsampling))
     x = x.reshape(-1,1)
     y = y.reshape(-1,1)
     if(degree):

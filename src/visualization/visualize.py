@@ -46,7 +46,7 @@ def plot_surf(x,y,z,title):
     surf = ax.plot_surface(xi, yi, zi, cmap=cm.coolwarm,
                            linewidth=0, antialiased=True,vmin=np.nanmin(z), vmax=np.nanmax(z))
 
-    
+    ax.view_init(30, 250)
     ax.zaxis.set_major_locator(LinearLocator(8))
     ax.zaxis.set_major_formatter(FormatStrFormatter('%.02f'))
     plt.setp(ax.zaxis.get_majorticklabels(), ha='left')

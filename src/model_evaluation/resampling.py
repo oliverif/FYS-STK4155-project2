@@ -15,7 +15,7 @@ def bootstrap(model, X_train, X_test, z_train,n_bootstraps=200):
 
 def bias_var(model, X_train,X_test, z_train,z_test, n_bootstraps=200):
     
-    z_pred = bootstrap(model,X_train, z_train, X_test,n_bootstraps)
+    z_pred = bootstrap(model,X_train, X_test, z_train,n_bootstraps)
     error = mean( mean((z_test - z_pred)**2, axis=1, keepdims=True) )
     bias = mean( (z_test - mean(z_pred, axis=1, keepdims=True))**2 )
     variance = mean( var(z_pred, axis=1, keepdims=True) )
@@ -88,6 +88,8 @@ def cross_val_score(model, X, z, k_folds, X_scaler=None, z_scaler = None, metric
     if (metrics is not None):
         score_dict={'train':{},'test':{}}
         for metric in metrics:
+            #Calculates the mean score from the cross validation
+            #and adds train and test metrics(MSE,R2 etc) to score_dict.
             score_dict['train'].update({metric:mean(scores['train_scores'][metric])})
             score_dict['test'].update({metric:mean(scores['test_scores'][metric])})
         return score_dict
