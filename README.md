@@ -1,8 +1,12 @@
 # FYS-STK4155-project2
 This repository contains all code written for Project 2 in FYS-STK4155.
 
+Ensure all packages in ´requirements.txt` are installed.
 
+´notebooks/Reports´ contains notebooks specifically targeting each sub task of the project.
+Refer to those for more details on the process.
 
+The final written accompanying report can be found diretly in the repository as ´Project_2.pdf´.
 
 Project structure
 ------------
@@ -57,4 +61,7 @@ FYS-STK4155-project2
 │           visualize.py
 │
 └───tests                               <--Tests
-        Activation function tests.ipynb
+│       Activation function tests.ipynb
+│
+└───Project_2.pdf                       <--Final report
+        
