@@ -1,17 +1,60 @@
 # FYS-STK4155-project2
-Code and report on project 2 in course Applied Data Analysis and Machine Learning
+This repository contains all code written for Project 2 in FYS-STK4155.
 
-### TODO
-1. Complete linreg with sgd
-2. Implement ridge sgd
-3. Add momentum and RMSprop or other
-4. Implement learning rate and lambda study and plotting functions
-5. Create notebook for part a)
-7. Implement nn class
-8. Implement backpropagation
-9. Implement ffnn cost functions
-10. Implement activation functions
-11. Implement train function
-12. Create notebook for part b)
-13. Classification nn
-14. Classification logistic reg
+
+
+
+Project structure
+------------
+FYS-STK4155-project2
+│   README.md
+│   requirements.txt                    <-- Package requirements/dependencies for this project
+│
+├───data                                <-- Data used for modelling
+│   └───raw
+│           SRTM_data_Norway_1.tif
+│           SRTM_data_Norway_2.tif
+│
+├───figures                             <-- Figures and images produced
+│   ├───classification
+│   │   ├───logreg
+│   │   └───mlp
+│   └───regression
+│       ├───mlp
+│       └───sgdregressor
+├───notebooks                           <-- Notebooks used in this project
+│   ├───Reports                         <-- Notebooks specifically targeting a task
+│   │       Part a.ipynb
+│   │       Part_b_and_c.ipynb
+│   │       Part_d.ipynb
+│   │       Part_e.ipynb
+│   │
+│   └───Sketches                        <-- Sketches used during code development
+├───src                                 <-- All source code for develop library
+│   ├───data                            <-- Submodules for loading and creating data set
+│   │       create_dataset.py
+│   │
+│   ├───modelling                       <--The core of this project, i.e the models
+│   │       linreg.py                   <--Linear regression, with and without SGD
+│   │       logreg.py                   <--Logistic regression
+│   │       nn.py                       <--Neural Network
+│   │       _functions.py               <--Selected functions used by above models
+│   │       _sgdBase.py                 <--Base SGD which all SGD based models inherit from
+│   │
+│   ├───model_evaluation                <--Scripts for evaluating models
+│   │       metrics.py                  <--Metrics like MSE, R2 and accuracy
+│   │       param_analysis.py           <--Scripts for conducting parameter analysis,
+│   │                                      like gridsearch
+│   │       resampling.py               <--Resampling scripts like cv and bootstrap
+│   │
+│   ├───processing                      <--Scripts for preprocessing of data
+│   │       data_preprocessing.py
+│   │
+│   ├───utils                           <--Utility/helper functions
+│   │       utils.py
+│   │
+│   └───visualization                   <--Visualization scripts
+│           visualize.py
+│
+└───tests                               <--Tests
+        Activation function tests.ipynb

@@ -4,7 +4,9 @@ import pandas as pd
 from .resampling import cross_val_score
 import timeit
 
-def evaluate_parameter(model, params,metrics, X, z,X_scaler,z_scaler):
+
+
+def evaluate_parameter(model, params, metrics, X, z,X_scaler,z_scaler):
     '''
     Fits a model using for every 
     'param' value in 'vals'.
@@ -22,6 +24,14 @@ def evaluate_parameter(model, params,metrics, X, z,X_scaler,z_scaler):
     model: model 
         A LinReg,SGD_linreg,NeuralNetwork)
         SGD optimizer object used to fit weights with above parameter
+        
+    Output:
+    -------
+    score_dict: dict{metric:{'train':scores, 'test':scores}}
+        Nested dictionary containing the metrics for the parameters.
+        I.e each outer value is the metric name, which then contains
+        dictionary with train and test scores. The scores has length
+        
     '''
     param_name = list(params.keys())[0]
 
@@ -90,8 +100,9 @@ def grid_search_df(X, z, model, param_grid):
     '''
     #Gridsearch object
     gs = GridSearchCV(estimator = model, 
+                      cv=5,
                       param_grid = param_grid,
-                      n_jobs=-1)
+                      n_jobs=1)
     #Fit the model
     gs = gs.fit(X,z)
     #Create list of parameters as presented in the GridSearchCV

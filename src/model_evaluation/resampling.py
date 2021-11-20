@@ -55,16 +55,16 @@ def cross_validate(model, X, z, k_folds=5, X_scaler=None, z_scaler = None, metri
             X_test = X_scaler.transform(X_test)
  
         if(z_scaler is not None):
-            z_train = z_scaler.fit_transform(z_train)
-            z_test = z_scaler.transform(z_test) 
+            z_train = z_scaler.fit_transform(z_train.reshape(-1,1))
+            z_test = z_scaler.transform(z_test.reshape(-1,1)) 
         
         model.fit(X_train, z_train)
         if(metrics is not None):
             p_train = model.predict(X_train)
             p_test = model.predict(X_test)
             for metric in metrics:
-                train_scores[metric].append(METRIC_FUNC[metric](z_train,p_train))
-                test_scores[metric].append(METRIC_FUNC[metric](z_test,p_test))
+                train_scores[metric].append(METRIC_FUNC[metric](z_train,p_train.reshape(-1,1)))
+                test_scores[metric].append(METRIC_FUNC[metric](z_test,p_test.reshape(-1,1)))
                 
         else:
             train_scores.append(model.score(X_train, z_train))

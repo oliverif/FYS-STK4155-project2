@@ -231,7 +231,7 @@ class SGD_linreg(SGD_optimizer):
                  lr0 = 0.01,
                  batch_size=32,
                  n_epochs=100,
-                 t0 = 20,t1 = 100, 
+                 t0 = 1,t1 = 50, 
                  power_t = 0.05,
                  val_fraction = 0.1
                  ):
@@ -249,9 +249,8 @@ class SGD_linreg(SGD_optimizer):
                          val_fraction=val_fraction
                          )
 
-      
+    
         #Additional parameters for this SGD linear regression
-        self.v = 0
         self.fit_intercept = fit_intercept
         self.params += ['fit_intercept']
 
@@ -271,7 +270,7 @@ class SGD_linreg(SGD_optimizer):
         #Reset intercept
         self.intercept = 0
         #Reset velocity
-        self.v = 0
+        self.v = zeros(shape[1]).reshape(-1,1)
 
 
     def score(self,X,z):
@@ -366,7 +365,7 @@ class SGD_linreg(SGD_optimizer):
             update.
         
         '''
-        p = self.predict(X)
+        p = self.predict_continuous(X)
         update = p - z
         #Update intercept
         if (self.fit_intercept):
@@ -374,8 +373,8 @@ class SGD_linreg(SGD_optimizer):
 
         #Add momentum
         if (self.momentum):    
-            self.v = self.momentum*self.v - self.lr*self.cost_grad(X,update)
-            self.beta += self.v          
+            self.v = self.momentum*self.v + self.lr*self.cost_grad(X,update)
+            self.beta -= self.v          
         else:
             self.beta -= self.lr*self.cost_grad(X,update)
             
@@ -404,9 +403,10 @@ class SGD_linreg(SGD_optimizer):
         grad: ndarray of shape(n_samples,1)
             Gradient of the beta values.
         '''
-        grad = (2/X.shape[0])*(X.T @ update)
+        grad = (1/X.shape[0])*(X.T @ update)
+
         if (self.regularization=='l2'):
-            grad += (2/X.shape[0])*self.lmb*self.beta
+            grad += (1/X.shape[0])*self.lmb*self.beta
 
         return grad
     

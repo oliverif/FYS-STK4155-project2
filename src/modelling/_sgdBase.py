@@ -1,7 +1,9 @@
+import math
 from numpy import random, arange
 from sklearn.utils import shuffle
 from sklearn.model_selection import train_test_split
 from abc import abstractmethod
+
 
 from src.visualization.visualize import plot_curves
 from ._functions import LOSS_FUNCS
@@ -59,9 +61,10 @@ class SGD_optimizer(object):
                        'batch_size',
                        'n_epochs',
                        't0', 
+                       't1',
                        'power_t' 
                        ]
-        
+
     @abstractmethod
     def initialize(self,shape):
         '''Initialize weights, biases and or other paremeters'''
@@ -138,7 +141,9 @@ class SGD_optimizer(object):
         self.learning_schedule = self.set_schedule()
 
         #The number of batches is calculated from batch size.
-        n_batches = int(z.shape[0]/self.batch_size)
+        #Ceil us used as z-shape[0] migh not be divisible by 
+        #batch size.
+        n_batches = math.ceil(z.shape[0]/self.batch_size)
     
         for epoch in range(self.n_epochs):
             #Shuffle training data

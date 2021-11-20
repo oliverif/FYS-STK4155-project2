@@ -135,11 +135,7 @@ class NeuralNetwork(SGD_optimizer):
                          power_t = power_t,
                          val_fraction=val_fraction               
                          )
-        self.hidden_layer_sizes = hidden_layer_sizes
-        self.n_layers = len(hidden_layer_sizes)+1 #+1 for outputlayer
-        self.layers = [None]*(len(hidden_layer_sizes)+1)
-        self.weights = [None]*(len(hidden_layer_sizes)+1)
-        self.biases = [None]*(len(hidden_layer_sizes)+1)
+        self.hidden_layer_sizes = hidden_layer_sizes  
         self.w_init = w_init
         self.b_init = b_init
         self.n_categories = n_categories        
@@ -149,7 +145,8 @@ class NeuralNetwork(SGD_optimizer):
         #Enables the use of SKlearn CVGridsearch
         new_params = ['hidden_layer_sizes',
                       'hidden_activation',
-                      'output_activation']     
+                      'output_activation',
+                      'w_init']     
         self.params += new_params
         
     def initialize(self,input_shape):
@@ -170,7 +167,8 @@ class NeuralNetwork(SGD_optimizer):
             The shape of the input data so that
             all subsequent layers can be initialized.
         '''
-        
+        self.n_layers = len(self.hidden_layer_sizes)+1 #+1 for outputlayer
+        self.layers = [None]*(len(self.hidden_layer_sizes)+1)
         self.n_samples,self.n_features = input_shape
         prev_shape = (self.hidden_layer_sizes[0],input_shape[1])
         for layer,neurons in enumerate(self.hidden_layer_sizes):
@@ -277,6 +275,18 @@ class NeuralNetwork(SGD_optimizer):
         return np.where(p<0.5,0,1)
     
     def predict_continuous(self,X):
+        '''
+        Outputs the prediction with continuous
+        values. AKA predicts probabilities.
+        
+        Inputs:
+        -------
+        X: ndarray(n_samples,n_features)
+            Design matrix
+        '''
+        return self._fast_feed_forward(X)
+    
+    def predict_proba(self,X):
         '''
         Outputs the prediction with continuous
         values. AKA predicts probabilities.
@@ -461,11 +471,11 @@ class NeuralNetwork(SGD_optimizer):
         
         if (self.momentum): 
             #Calculate and store velocities for weights and bias gradients   
-            layer.v_w = self.momentum*layer.v_w - self.lr*w_grad
-            layer.v_b = self.momentum*layer.v_b - self.lr*b_grad
+            layer.v_w = self.momentum*layer.v_w + self.lr*w_grad
+            layer.v_b = self.momentum*layer.v_b + self.lr*b_grad
             #Update weights and biases with velocity
-            layer.weights += layer.v_w
-            layer.bias += layer.v_b
+            layer.weights -= layer.v_w
+            layer.bias -= layer.v_b
             
         else:
             #Update weights and biases with gradients
@@ -486,8 +496,9 @@ class NeuralNetwork(SGD_optimizer):
         if(self.regularization=='l2'):
             w_grad += self.lmb * current_layer_w
         #Dividing by batch size allows for more comparable results with
-        #different batch sizes.
-        w_grad /=self.batch_size       
+        #different batch sizes. Note that error.shape[0] must be used
+        #as batch sizes might differ.
+        w_grad /=error.shape[0]       
         return w_grad,b_grad
 
  
