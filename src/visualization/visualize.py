@@ -68,6 +68,7 @@ def plot_surf_from_X(X,z,title):
     '''
     Plotting surface directly from degisn matrix.
     Assumes the feature x is along column 1 of X, and feature y is along column 2.
+    The function sorts the surface first.
     '''
     X,z = sort_surface(X,z)
     if(X.shape[1]==2):

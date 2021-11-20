@@ -1,9 +1,10 @@
 def sort_surface(X,z):
     '''
     Sorts the design matrix and correspondix targed 
-    data in a Radiz sort fashion.
+    data in a Radix sort fashion.
     First sort by x-column, then sort by y-column.
     'Stable' sort must be used to obtain correct order.
+    This enables the plotting of shuffled data.
     '''
     if(X.shape[1]!=2):
         p1 = X[:,1].argsort(kind='stable')   
