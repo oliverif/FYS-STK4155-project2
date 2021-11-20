@@ -10,6 +10,7 @@ The final written accompanying report can be found diretly in the repository as 
 
 Project structure
 ------------
+ ```
 FYS-STK4155-project2
 │   README.md
 │   requirements.txt                    <-- Package requirements/dependencies for this project
@@ -64,4 +65,4 @@ FYS-STK4155-project2
 │       Activation function tests.ipynb
 │
 └───Project_2.pdf                       <--Final report
-        
+```        
